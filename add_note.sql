@@ -1,4 +1,6 @@
-INSERT INTO "Note" ("NoteId", "Guid", "UserMarkId", "LocationId", "Title", "Content", "LastModified", "BlockType", "BlockIdentifier") 
+
+
+INSERT OR IGNORE INTO "Note" ("NoteId", "Guid", "UserMarkId", "LocationId", "Title", "Content", "LastModified", "BlockType", "BlockIdentifier") 
 VALUES ('4', 'aaabbbcc-dddd-eeee-ffff-ggghhhiiijjj', '6', '6', 'HOLA', 'Hola', '2023-04-16T19:08:08+00:00', '1', '5');
 
 --INSERT INTO Location (LocationId, DocumentId, IssueTagNumber, KeySymbol, MepsLanguage, Type, Title) -- NO HACE FALTA
