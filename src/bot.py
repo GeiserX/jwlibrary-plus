@@ -249,10 +249,10 @@ async def begin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if bool(url) & any(qs): # If URL is in place and there is any question set
         filename = core_worker.main(url, update.effective_user.id, qs)
-        await update.message.reply_text("Aquí tienes tu fichero. Impórtalo a JW Library")
+        await update.message.reply_text("Aquí tiene su fichero. Impórtelo a JW Library")
         await update.message.reply_document(document=open(filename, "rb"))
     else:
-        await update.message.reply_text("No has introducido URL o todas las preguntas están vacías")
+        await update.message.reply_text("No ha introducido la URL o todas las preguntas están vacías")
 
 def main() -> None:
 
