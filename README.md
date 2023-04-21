@@ -9,13 +9,8 @@ This is a Telegram bot assistant to help you prepare for Jehovah's Witnesses wee
 - [Background](#background)
 - [Install](#install)
 - [Usage](#usage)
-	- [Generator](#generator)
-- [Badge](#badge)
-- [Example Readmes](#example-readmes)
-- [Related Efforts](#related-efforts)
 - [Maintainers](#maintainers)
 - [Contributing](#contributing)
-- [License](#license)
 
 ## Background
 
