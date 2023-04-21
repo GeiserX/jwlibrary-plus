@@ -1,6 +1,6 @@
 # JW Library Plus
 
-[![jwlibrary-plus compliant](https://img.shields.io/github/license/DrumSergio/jwlibrary-plus)](https://github.com/DrumSergio/jwlibrary-plus/README)
+[![jwlibrary-plus compliant](https://img.shields.io/github/license/DrumSergio/jwlibrary-plus)](https://github.com/DrumSergio/jwlibrary-plus/LICENSE)
 
 This is a Telegram bot assistant to help you prepare for Jehovah's Witnesses weekend meetings. It uses ChatGPT 3.5-turbo to write contextual notes for each paragraph.
 
