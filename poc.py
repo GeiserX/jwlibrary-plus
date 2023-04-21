@@ -1,4 +1,5 @@
 import uuid
+import shutil
 import pytz
 import os
 import zipfile
@@ -16,12 +17,21 @@ from langchain.memory import ConversationBufferMemory
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 from langchain.callbacks import get_openai_callback # TODO
 
-
-langchain.llm_cache = SQLiteCache(database_path="langchain.db")
-
 # Current variables which will not be variables
 url = "https://www.jw.org/es/biblioteca/revistas/atalaya-estudio-febrero-2023/Mantengan-su-buen-juicio-y-est%C3%A9n-vigilantes/"
 telegram_user = "850003"
+
+timenow = datetime.datetime.now(pytz.timezone('Europe/Madrid')).strftime("%F_%T_%Z") 
+dbOriginal = "userData.db.original"
+dbUser = "userData-{0}-{1}.db".format(telegram_user, timenow)
+
+langchain.llm_cache = SQLiteCache(database_path="langchain.db")
+shutil.copyfile(src=dbOriginal, dst=dbUser)
+
+
+#############################
+### BEGIN EXTRACTING HTML ###
+#############################
 
 html = requests.get(url).text
 soup = BeautifulSoup(html, features="html5lib")
@@ -91,15 +101,14 @@ for q in q_map.values():
 now = datetime.datetime.now(pytz.timezone('Europe/Madrid'))
 now_date = now.strftime("%Y-%m-%d")
 now_iso = now.isoformat("T", "seconds")
-j = '{{"name":"jwlibrary-plus-backup_{0}","creationDate":"{1}","version":1,"type":0,"userDataBackup":{{"lastModifiedDate":"{2}","deviceName":"jwlibrary-plus","databaseName":"userData.db","schemaVersion":8}}}}'.format(now_date, now_date, now_iso)
+j = '{{"name":"jwlibrary-plus-backup_{0}","creationDate":"{1}","version":1,"type":0,"userDataBackup":{{"lastModifiedDate":"{2}","deviceName":"jwlibrary-plus","databaseName":"{3}","schemaVersion":8}}}}'.format(now_date, now_date, now_iso, dbUser)
 manifest = json.loads(j) #DELETED HASH value b87840c4b4ac4cd30f104b8effc2dd9cc047e135a16658f3814f97fa6b17e3f5 in "j"
 
 with open('manifest.json', 'w') as f:
     json.dump(manifest, f)
 
 
-db_file = "userData.db"
-connection = sqlite3.connect(db_file)
+connection = sqlite3.connect(dbUser)
 cursor = connection.cursor()
 
 cursor.execute("""INSERT INTO Location (LocationId, DocumentId, IssueTagNumber, KeySymbol, MepsLanguage, Type, Title)
@@ -127,7 +136,7 @@ cursor.execute("UPDATE LastModified SET LastModified = '{0}'".format(now_iso))
 connection.commit()
 connection.close()
 
-zf = zipfile.ZipFile("jwlibrary-plus-{0}.jwlibrary".format(documentId), "w")
-zf.write("userData.db")
+zf = zipfile.ZipFile("jwlibrary-plus-{0}-{1}.jwlibrary".format(documentId, timenow), "w")
+zf.write(dbUser)
 zf.write("manifest.json")
 zf.close()
