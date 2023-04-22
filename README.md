@@ -3,7 +3,7 @@
 
 [![jwlibrary-plus compliant](https://img.shields.io/github/license/DrumSergio/jwlibrary-plus)](https://github.com/DrumSergio/jwlibrary-plus/blob/main/LICENSE)
 
-This is a Telegram bot assistant to help you prepare for Jehovah's Witnesses weekend meetings. It uses ChatGPT 3.5-turbo to write contextual notes for each paragraph.
+This project is a Telegram bot assistant to help you prepare for Jehovah's Witnesses weekend meetings. It uses ChatGPT 3.5-turbo to write contextual notes for each paragraph, with configurable inputs.
 
 ## Table of Contents
 
@@ -15,19 +15,19 @@ This is a Telegram bot assistant to help you prepare for Jehovah's Witnesses wee
 
 ## Background
 
-JW Library Plus started with the idea of bringing more data to meeting preparation. This should not interfere with meeting preparation, but it should be taken as an enhancer.
+JW Library Plus was conceived with the idea of facilitating the access to the Library's corpus, with the aim of bringing contextual data from Jehovah's Witness publications to enhance meeting preparation.
 
 ## Install
 
 This project uses a [Docker container](https://hub.docker.com/repository/docker/drumsergio/jwlibrary-plu) to deploy a Telegram Bot handler.
 
 ```sh
-$ docker run --name jwlibrary-plus -e TOKEN=[TOKEN] drumsergio/jwlibrary-plus
+$ docker run --name jwlibrary-plus -e TOKEN=[TOKEN] -e OPENAI_API_KEY=[KEY] drumsergio/jwlibrary-plus
 ```
 
 ## Usage
 
-It is officially available at [@jwlibrary_plus_bot](https://t.me/jwlibrary_plus_bot)
+Officially available at [@jwlibrary_plus_bot](https://t.me/jwlibrary_plus_bot).
 
 ## Maintainers
 
