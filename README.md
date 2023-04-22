@@ -37,7 +37,7 @@ Officially available at [@jwlibrary_plus_bot](https://t.me/jwlibrary_plus_bot).
 
 Feel free to dive in! [Open an issue](https://github.com/DrumSergio/jwlibrary-plus/issues/new) or submit PRs.
 
-JW Library Plus follows the [Contributor Covenant](http://contributor-covenant.org/version/1/3/0/) Code of Conduct.
+JW Library Plus follows the [Contributor Covenant](http://contributor-covenant.org/version/2/1/) Code of Conduct.
 
 ### Contributors
 
