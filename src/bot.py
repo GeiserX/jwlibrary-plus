@@ -5,14 +5,13 @@ import validators
 from urllib.parse import urlparse
 import sys
 import core_worker
-from telegram import Update, ForceReply, InlineKeyboardMarkup, InlineKeyboardButton # TODO check what's really needed
-from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters, CallbackContext, CallbackQueryHandler
+from telegram import Update, ForceReply
+from telegram.ext import Application, CommandHandler, ContextTypes
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-init_questions=["La respuesta directa, breve y concisa a la pregunta principal",
-                "Una ilustración o ejemplo para explicar algún punto principal del párrafo",
+init_questions=["Una ilustración o ejemplo para explicar algún punto principal del párrafo",
                 "Una experiencia en concreto, aportando referencias exactas, que esté muy relacionada con el párrafo",
                 "¿Qué me enseña este párrafo sobre Jehová?",
                 "Una explicación sobre uno de los textos que aparezcan, que aplique al párrafo. Usa la Biblia de Estudio de los Testigos de Jehová.",
@@ -30,7 +29,7 @@ Este bot le ayudará a prepararse las reuniones usando técnicas avanzadas de In
 <u>El funcionamiento es el siguiente</u>:
   1. Introduzca la URL de jw.org de la Atalaya que quiera preparar con el comando /url [URL]
   2. Introduzca las preguntas que quiera hacer. Defina las preguntas y se aplicarán a <b>todos</b> los párrafos, con un máximo de 10. 
-Por defecto, hay 7 preguntas incluidas. Se usa con /q1 [PREGUNTA_1], /q2 [PREGUNTA_2].... Para consultar las preguntas configuradas, usa /showq
+Por defecto, hay 6 preguntas incluidas. Se usa con /q1 [PREGUNTA_1], /q2 [PREGUNTA_2].... Para consultar las preguntas configuradas, usa /showq
   3. Una vez haya elegido sus parámetros, ejecute /begin y espere unos minutos a que se genere el archivo <code>.jwlibrary</code>
   4. Descárguelo y restaure esta copia en su app JW Library (Borrará los datos, si no quiere que eso suceda, use una app como Merge JWL)
 
@@ -42,13 +41,13 @@ Descargo de Responsabilidad: El software aquí presente se ofrece tal cual, sin 
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
     cursor.execute("INSERT OR IGNORE INTO Main (UserId) VALUES ({0})".format(user_id))
-    cursor.execute("UPDATE Main SET q1 = '{0}', q2 = '{1}', q3 = '{2}', q4 = '{3}', q5 = '{4}', q6 = '{5}', q7 = '{6}' WHERE UserId = {7}".format(init_questions[0], init_questions[1], init_questions[2], init_questions[3], init_questions[4], init_questions[5], init_questions[6], user_id))
+    cursor.execute("UPDATE Main SET q1 = '{0}', q2 = '{1}', q3 = '{2}', q4 = '{3}', q5 = '{4}', q6 = '{5}' WHERE UserId = {6}".format(init_questions[0], init_questions[1], init_questions[2], init_questions[3], init_questions[4], init_questions[5], user_id))
     connection.commit()
     connection.close()
 
 
 async def url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("Testeando URL. Por favor, espere.")
+    await update.message.reply_text("Testeando URL, espere por favor.")
     url = context.args[0]
     user = update.effective_user
     logger.info("URL - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - URL: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, url))
@@ -66,7 +65,7 @@ async def url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         else:
             await update.message.reply_text("No es un una URL de www.jw.org")
     else:
-        await update.message.reply_text("No es un una URL válida")
+        await update.message.reply_text("No es un una URL válida.")
 
 async def q1(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     question = ' '.join(context.args[:])
@@ -76,11 +75,11 @@ async def q1(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         user_id = update.effective_user.id
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
-        cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2})".format(sys._getframe().f_code.co_name, question, user_id))
+        cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
         connection.commit()
         connection.close()
     else:
-        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres")
+        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
 
 async def q2(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     question = ' '.join(context.args[:])
@@ -94,7 +93,7 @@ async def q2(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         connection.commit()
         connection.close()
     else:
-        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres")
+        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
         
 async def q3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     question = ' '.join(context.args[:])
@@ -108,7 +107,7 @@ async def q3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         connection.commit()
         connection.close()
     else:
-        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres")
+        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
         
 async def q4(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     question = ' '.join(context.args[:])
@@ -122,7 +121,7 @@ async def q4(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         connection.commit()
         connection.close()
     else:
-        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres")
+        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
         
 async def q5(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     question = ' '.join(context.args[:])
@@ -136,7 +135,7 @@ async def q5(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         connection.commit()
         connection.close()
     else:
-        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres")
+        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
         
 async def q6(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     question = ' '.join(context.args[:])
@@ -150,7 +149,7 @@ async def q6(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         connection.commit()
         connection.close()
     else:
-        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres")
+        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
         
 async def q7(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     question = ' '.join(context.args[:])
@@ -164,7 +163,7 @@ async def q7(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         connection.commit()
         connection.close()
     else:
-        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres")
+        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
         
 async def q8(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     question = ' '.join(context.args[:])
@@ -178,7 +177,7 @@ async def q8(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         connection.commit()
         connection.close()
     else:
-        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres")
+        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
         
 async def q9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     question = ' '.join(context.args[:])
@@ -192,7 +191,7 @@ async def q9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         connection.commit()
         connection.close()
     else:
-        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres")
+        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
 
 async def q10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     question = ' '.join(context.args[:])
@@ -206,7 +205,7 @@ async def q10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         connection.commit()
         connection.close()
     else:
-        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres")
+        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
 
 async def showq(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
@@ -247,11 +246,11 @@ async def begin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if bool(url) & any(qs): # If URL is in place and there is any question set
         filename = core_worker.main(url, update.effective_user.id, qs)
-        await update.message.reply_text("Aquí tiene su fichero. Impórtelo a JW Library")
+        await update.message.reply_text("Aquí tiene su fichero, impórtelo a JW Library.")
         await update.message.reply_document(document=open(filename, "rb"))
         os.remove(filename)
     else:
-        await update.message.reply_text("No ha introducido la URL o todas las preguntas están vacías")
+        await update.message.reply_text("No ha introducido la URL o todas las preguntas están vacías.")
 
 def main() -> None:
 

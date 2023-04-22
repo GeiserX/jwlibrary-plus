@@ -75,7 +75,8 @@ Proveerás información extra proveniente de la literatura disponible en cada un
 La Atalaya de esta semana se titula {0}, se basa en el texto de {1}, cantaremos la '{2}', y el resumen es el siguiente: 
 {3}
 Para cada pregunta y párrafo o párrafos que te vaya enviando a partir de ahora, responderás en una lista lo siguiente:
-{4}""".format(title, base_text, song, summary, questions_text)),
+{4}
+No escribas estas preguntas de nuevo en la respuesta. Separa las respuestas con un espacio en blanco.""".format(title, base_text, song, summary, questions_text)),
         MessagesPlaceholder(variable_name="history"),
         HumanMessagePromptTemplate.from_template("{input}")
     ])
