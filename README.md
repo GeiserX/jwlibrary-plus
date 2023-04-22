@@ -25,6 +25,8 @@ This project uses a [Docker container](https://hub.docker.com/repository/docker/
 $ docker run --name jwlibrary-plus -e TOKEN=[TOKEN] -e OPENAI_API_KEY=[KEY] drumsergio/jwlibrary-plus
 ```
 
+Docker Hub image available at [drumsergio/jwlibrary-plus](https://hub.docker.com/repository/docker/drumsergio/jw-library-plus/general).
+
 ## Usage
 
 Officially available at [@jwlibrary_plus_bot](https://t.me/jwlibrary_plus_bot).
