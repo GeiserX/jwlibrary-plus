@@ -22,26 +22,27 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info("START - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
 
-    await update.message.reply_html(rf"""Bienvenido! 
+    await update.message.reply_html(rf"""¡Bienvenido! 😊
 
 Este bot le ayudará a prepararse las reuniones usando técnicas avanzadas de Inteligencia Artificial, aplicadas especialmente a la relación de datos en la literatura de la organización.
 
 <u>El funcionamiento es el siguiente</u>:
   1. Introduzca la URL de jw.org de la Atalaya que quiera preparar con el comando /url [URL]
   2. Introduzca las preguntas que quiera hacer. Defina las preguntas y se aplicarán a <b>todos</b> los párrafos, con un máximo de 10. Por defecto, hay 6 preguntas incluidas. Se usa con /q1 [PREGUNTA_1], /q2 [PREGUNTA_2].... Para consultar las preguntas configuradas, usa /showq
-  3. Si no quiere perder datos, envíe su archivo de copia de seguridad de su aplicación de JW Library en formato <code>.jwlibrary</code> usando /sendbackup y acto seguido enviando el archivo. Recomendamos que el artículo esté vacío para evitar problemas de posible corrupción de datos.
+  3. Si no quiere perder datos, envíe su archivo de copia de seguridad de su aplicación de JW Library en formato <code>.jwlibrary</code> usando /sendbackup y acto seguido enviando el archivo. Recomendamos que el artículo que quiera prepararse esté vacío para evitar problemas de posible corrupción de datos.
   4. Una vez haya elegido sus parámetros, ejecute /begin y espere unos minutos a que se genere el archivo <code>.jwlibrary</code>
   5. Descárguelo y restaure esta copia en su app JW Library.
 
 <u>Repositorio oficial:</u> https://github.com/DrumSergio/jwlibrary-plus
-<u>Descargo de Responsabilidad:</u> El software aquí presente se ofrece tal cual, sin ninguna garantía.""",
+<u>Descargo de Responsabilidad:</u> El software aquí presente se ofrece tal cual, sin ninguna garantía.
+<u>Nota Importante:</u> Cada vez que ejecute /start , sus preguntas guardadas se <b>borrarán</b> y comenzará con las que el software ofrece por defecto.""",
         reply_markup=ForceReply(selective=True),)
     
     user_id = update.effective_user.id
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
     cursor.execute("INSERT OR IGNORE INTO Main (UserId) VALUES ({0})".format(user_id))
-    cursor.execute("UPDATE Main SET q1 = '{0}', q2 = '{1}', q3 = '{2}', q4 = '{3}', q5 = '{4}', q6 = '{5}' WHERE UserId = {6}".format(init_questions[0], init_questions[1], init_questions[2], init_questions[3], init_questions[4], init_questions[5], user_id))
+    cursor.execute("UPDATE Main SET q1 = '{0}', q2 = '{1}', q3 = '{2}', q4 = '{3}', q5 = '{4}', q6 = '{5}', q7 = '', q8 = '', q9 = '', q10 = '' WHERE UserId = {6}".format(init_questions[0], init_questions[1], init_questions[2], init_questions[3], init_questions[4], init_questions[5], user_id))
     connection.commit()
     connection.close()
 
@@ -69,139 +70,139 @@ async def url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text("No es un una URL válida.")
 
 async def q1(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    question = ' '.join(context.args[:])
+    question = ' '.join(context.args[:]).replace('"', '').replace("'", "").replace(";", "").replace("(", "").replace(")", "") # Prevent user from messing with the input
     user = update.effective_user
     logger.info("Q1 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
-    if(len(question) < 150):
+    if(len(question) < 200):
         user_id = update.effective_user.id
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
         cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
         connection.commit()
         connection.close()
-        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
+        await update.message.reply_text("Pregunta {0} guardada correctamente.".format(sys._getframe().f_code.co_name[1:]))
     else:
-        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
+        await update.message.reply_text("La pregunta debe tener menos de 200 caracteres.")
 
 async def q2(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     question = ' '.join(context.args[:])
     user = update.effective_user
     logger.info("Q2 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
-    if(len(question) < 150):
+    if(len(question) < 200):
         user_id = update.effective_user.id
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
         cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
         connection.commit()
         connection.close()
-        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
+        await update.message.reply_text("Pregunta {0} guardada correctamente.".format(sys._getframe().f_code.co_name[1:]))
     else:
-        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
+        await update.message.reply_text("La pregunta debe tener menos de 200 caracteres.")
         
 async def q3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     question = ' '.join(context.args[:])
     user = update.effective_user
     logger.info("Q3 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
-    if(len(question) < 150):
+    if(len(question) < 200):
         user_id = update.effective_user.id
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
         cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
         connection.commit()
         connection.close()
-        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
+        await update.message.reply_text("Pregunta {0} guardada correctamente.".format(sys._getframe().f_code.co_name[1:]))
     else:
-        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
+        await update.message.reply_text("La pregunta debe tener menos de 200 caracteres.")
         
 async def q4(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     question = ' '.join(context.args[:])
     user = update.effective_user
     logger.info("Q4 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
-    if(len(question) < 150):
+    if(len(question) < 200):
         user_id = update.effective_user.id
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
         cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
         connection.commit()
         connection.close()
-        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
+        await update.message.reply_text("Pregunta {0} guardada correctamente.".format(sys._getframe().f_code.co_name[1:]))
     else:
-        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
+        await update.message.reply_text("La pregunta debe tener menos de 200 caracteres.")
         
 async def q5(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     question = ' '.join(context.args[:])
     user = update.effective_user
     logger.info("Q5 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
-    if(len(question) < 150):
+    if(len(question) < 200):
         user_id = update.effective_user.id
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
         cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
         connection.commit()
         connection.close()
-        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
+        await update.message.reply_text("Pregunta {0} guardada correctamente.".format(sys._getframe().f_code.co_name[1:]))
     else:
-        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
+        await update.message.reply_text("La pregunta debe tener menos de 200 caracteres.")
         
 async def q6(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     question = ' '.join(context.args[:])
     user = update.effective_user
     logger.info("Q6 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
-    if(len(question) < 150):
+    if(len(question) < 200):
         user_id = update.effective_user.id
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
         cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
         connection.commit()
         connection.close()
-        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
+        await update.message.reply_text("Pregunta {0} guardada correctamente.".format(sys._getframe().f_code.co_name[1:]))
     else:
-        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
+        await update.message.reply_text("La pregunta debe tener menos de 200 caracteres.")
         
 async def q7(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     question = ' '.join(context.args[:])
     user = update.effective_user
     logger.info("Q7 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
-    if(len(question) < 150):
+    if(len(question) < 200):
         user_id = update.effective_user.id
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
         cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
         connection.commit()
         connection.close()
-        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
+        await update.message.reply_text("Pregunta {0} guardada correctamente.".format(sys._getframe().f_code.co_name[1:]))
     else:
-        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
+        await update.message.reply_text("La pregunta debe tener menos de 200 caracteres.")
         
 async def q8(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     question = ' '.join(context.args[:])
     user = update.effective_user
     logger.info("Q8 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
-    if(len(question) < 150):
+    if(len(question) < 200):
         user_id = update.effective_user.id
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
         cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
         connection.commit()
         connection.close()
-        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
+        await update.message.reply_text("Pregunta {0} guardada correctamente.".format(sys._getframe().f_code.co_name[1:]))
     else:
-        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
+        await update.message.reply_text("La pregunta debe tener menos de 200 caracteres.")
         
 async def q9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     question = ' '.join(context.args[:])
     user = update.effective_user
     logger.info("Q9 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
-    if(len(question) < 150):
+    if(len(question) < 200):
         user_id = update.effective_user.id
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
         cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
         connection.commit()
         connection.close()
-        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
+        await update.message.reply_text("Pregunta {0} guardada correctamente.".format(sys._getframe().f_code.co_name[1:]))
     else:
-        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
+        await update.message.reply_text("La pregunta debe tener menos de 200 caracteres.")
 
 async def q10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     question = ' '.join(context.args[:])
@@ -214,9 +215,9 @@ async def q10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
         connection.commit()
         connection.close()
-        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
+        await update.message.reply_text("Pregunta {0} guardada correctamente.".format(sys._getframe().f_code.co_name[1:]))
     else:
-        await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
+        await update.message.reply_text("La pregunta debe tener menos de 200 caracteres.")
 
 async def showq(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
@@ -228,7 +229,7 @@ async def showq(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     cursor.execute("SELECT q1,q2,q3,q4,q5,q6,q7,q8,q9,q10 FROM Main WHERE UserId = {0} LIMIT 1".format(user_id))
     data = cursor.fetchall()[0]
     connection.close()
-    await update.message.reply_text("""<u>Tus preguntas actuales:</u>
+    await update.message.reply_html("""<u>Tus preguntas actuales:</u>
 1. {0}
 2. {1}
 3. {2}

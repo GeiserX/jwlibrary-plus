@@ -1,6 +1,5 @@
-manifest.json
-userData.db
-*.jwlibrary
+dbs/langchain.db
+dbs/main.db
 
 # Byte-compiled / optimized / DLL files for Python
 src/__pycache__/

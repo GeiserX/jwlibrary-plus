@@ -62,7 +62,7 @@ def query_openai(title, base_text, song, summary, q_map, qs_user):
     logger.info("query_openai  - Title: {0} - Base Text: {1} - Song: {2} - Summary: {3} - Questions Map: {4} - Questions User: {5}".format(title, base_text, song, summary, q_map, qs_user))
     langchain.llm_cache = SQLiteCache(database_path="dbs/langchain.db")
 
-    questions = [f"{i}. {question}" for i, question in enumerate(qs_user, start=1) if question is not None]
+    questions = [f"{i}. {question}" for i, question in enumerate(qs_user, start=1) if question]
     questions_text = "\n".join(questions)
 
     llm = ChatOpenAI(model_name="gpt-3.5-turbo")
@@ -103,14 +103,20 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
     logger.info("write_jwlibrary - Document ID: {0} - Article ID: {1} - Title: {2} - Questions: {3} - Notes: {4} - Telegram User: {5}".format(documentId, articleId, title, questions, notes, telegram_user))
     uploadedJwLibrary = 'userBackups/{0}.jwlibrary'.format(telegram_user)
 
+    now = datetime.datetime.now(pytz.timezone('Europe/Madrid'))
+    now_date = now.strftime("%Y-%m-%d")
+    hour_minute_second = now.strftime("%H-%M-%S")
+    now_iso = now.isoformat("T", "seconds")
+
+    j = '{{"name":"jwlibrary-plus-backup_{0}","creationDate":"{1}","version":1,"type":0,"userDataBackup":{{"lastModifiedDate":"{2}","deviceName":"jwlibrary-plus","databaseName":"userData.db","schemaVersion":8}}}}'.format(now_date, now_date, now_iso)
+    manifest = json.loads(j)
+
     if(os.path.isfile(uploadedJwLibrary)):
+        logger.info("Archivo .jwlibrary encontrado")
         with zipfile.ZipFile(uploadedJwLibrary, 'r') as zip_ref:
             zip_ref.extractall("userBackups/{0}/".format(telegram_user)) # TODO: Check if it creates the folder
         uploadedDb = "userBackups/{0}/userData.db".format(telegram_user)
         manifestUser = "userBackups/{0}/manifest.json".format(telegram_user)
-
-        j = '{{"name":"jwlibrary-plus-backup_{0}","creationDate":"{1}","version":1,"type":0,"userDataBackup":{{"lastModifiedDate":"{2}","deviceName":"jwlibrary-plus","databaseName":"userData.db","schemaVersion":8}}}}'.format(now_date, now_date, now_iso)
-        manifest = json.loads(j)
 
         manifest_file = 'userBackups/{0}/manifest-{0}-{1}.json'.format(telegram_user, now_date)
         with open(manifest_file, 'w') as f:
@@ -131,24 +137,71 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
         cursor.execute("SELECT TagId FROM Tag WHERE Name = 'jwlibrary-plus'")
         tagId = cursor.fetchall()
         if not tagId:
-            cursor.execute("SELECT max(TagId) FROM Tag")
+            cursor.execute("SELECT max(TagId) FROM Tag") # There will be always some tag, even on a brand-new install
             tagId = cursor.fetchall()[0][0] + 1
             cursor.execute("INSERT INTO Tag ('TagId', 'Type', 'Name') VALUES ('{0}', '1', 'jwlibrary-plus')".format(tagId))
+            tagId +=1
+        else:
+            tagId = tagId[0][0]
+ 
+
+        cursor.execute("SELECT * FROM UserMark LIMIT 1")
+        nonEmptyUserMark = cursor.fetchall()
+        if nonEmptyUserMark:
+            cursor.execute("SELECT max(UserMarkId) FROM UserMark")
+            userMarkId = cursor.fetchall()[0][0] + 1
+        else:
+            userMarkId = 1
+
+        cursor.execute("SELECT BlockRangeId FROM BlockRange LIMIT 1")
+        nonEmptyBlockRangeId = cursor.fetchall()
+        if nonEmptyBlockRangeId:
+            cursor.execute("SELECT max(BlockRangeId) FROM BlockRange")
+            blockRangeId = cursor.fetchall()[0][0] + 1
+        else:
+            blockRangeId = 1
+
+        cursor.execute("SELECT * FROM Note LIMIT 1")
+        nonEmptyNote = cursor.fetchall()
+        if nonEmptyNote:
+            cursor.execute("SELECT max(NoteId) FROM Note")
+            noteId = cursor.fetchall()[0][0] + 1
+        else:
+            noteId = 1
+
+        cursor.execute("SELECT * FROM TagMap LIMIT 1")
+        nonEmptyTagMap = cursor.fetchall()
+        if nonEmptyTagMap:
+            cursor.execute("SELECT max(TagMapId) FROM TagMap")
+            tagMapId = cursor.fetchall()[0][0] + 1
+            cursor.execute("SELECT max(Position) FROM TagMap")
+            Position = cursor.fetchall()[0][0] + 1
+        else:
+            tagMapId = 1
+            Position = 0
 
         for i in notes:
             uuid_value = str(uuid.uuid4())
             uuid_value2 = str(uuid.uuid4())
 
             cursor.execute("""INSERT INTO UserMark ('UserMarkId', 'ColorIndex', 'LocationId', 'StyleIndex', 'UserMarkGuid', 'Version')
-            VALUES ('{0}', '2', '1', '0', '{1}', '1');""".format(i+1,uuid_value))
+            VALUES ('{0}', '2', '{1}', '0', '{2}', '1');""".format(userMarkId, locationId, uuid_value))
+            
 
             cursor.execute ("""INSERT INTO "BlockRange" ("BlockRangeId", "BlockType", "Identifier", "StartToken", "EndToken", "UserMarkId")
-            VALUES ('{0}', '1', '{1}', '0', '100', '{2}');""".format(i+1, questions[i].get("data-pid"), i+1))
+            VALUES ('{0}', '1', '{1}', '0', '100', '{2}');""".format(blockRangeId, questions[i].get("data-pid"), userMarkId))
+            
 
             cursor.execute("""INSERT INTO Note ("NoteId", "Guid", "UserMarkId", "LocationId", "Title", "Content", "LastModified", "BlockType", "BlockIdentifier") 
-            VALUES ('{0}', '{1}', '{2}', '1', '{3}', '{4}', '{5}', '1', '{6}');""".format(i+1, uuid_value2, i+1, questions[i].text, notes[i].replace("'", '"'), now_iso, questions[i].get("data-pid")))
+            VALUES ('{0}', '{1}', '{2}', '{3}', '{4}', '{5}', '{6}', '1', '{7}');""".format(noteId, uuid_value2, userMarkId, locationId, questions[i].text, notes[i].replace("'", '"'), now_iso, questions[i].get("data-pid")))
 
-            cursor.execute("INSERT INTO TagMap ('TagMapId', 'NoteId', 'TagId', 'Position') VALUES ('{0}', '{1}', '2', '{2}')".format(i+1,i+1,i))
+            cursor.execute("INSERT INTO TagMap ('TagMapId', 'NoteId', 'TagId', 'Position') VALUES ('{0}', '{1}', '{2}', '{3}')".format(tagMapId, noteId, tagId, Position))
+            userMarkId += 1
+            blockRangeId += 1
+            noteId +=1
+            tagMapId += 1
+            Position +=1
+
 
         cursor.execute("UPDATE LastModified SET LastModified = '{0}'".format(now_iso))
 
@@ -167,17 +220,10 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
         os.remove(manifestUser)
 
     else:
-        now = datetime.datetime.now(pytz.timezone('Europe/Madrid'))
-        now_date = now.strftime("%Y-%m-%d")
-        hour_minute_second = now.strftime("%H-%M-%S")
-        now_iso = now.isoformat("T", "seconds")
 
         dbOriginal = "dbs/userData.db.original"
         dbFromUser = "userBackups/{0}/userData-{0}-{1}_{2}.db".format(telegram_user, now_date, hour_minute_second)
         shutil.copyfile(src=dbOriginal, dst=dbFromUser)
-
-        j = '{{"name":"jwlibrary-plus-backup_{0}","creationDate":"{1}","version":1,"type":0,"userDataBackup":{{"lastModifiedDate":"{2}","deviceName":"jwlibrary-plus","databaseName":"userData.db","schemaVersion":8}}}}'.format(now_date, now_date, now_iso)
-        manifest = json.loads(j)
 
         manifest_file = 'userBackups/{0}/manifest-{0}-{1}.json'.format(telegram_user, now_date)
         with open(manifest_file, 'w') as f:
