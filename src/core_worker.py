@@ -9,7 +9,6 @@ import json
 import datetime
 import sqlite3
 from bs4 import BeautifulSoup
-#import html5lib
 import langchain
 from langchain.chat_models import ChatOpenAI
 from langchain.cache import SQLiteCache
@@ -102,59 +101,124 @@ No escribas estas preguntas de nuevo en la respuesta. Separa las respuestas con 
 def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_user):
 
     logger.info("write_jwlibrary - Document ID: {0} - Article ID: {1} - Title: {2} - Questions: {3} - Notes: {4} - Telegram User: {5}".format(documentId, articleId, title, questions, notes, telegram_user))
+    uploadedJwLibrary = 'userBackups/{0}.jwlibrary'.format(telegram_user)
 
-    now = datetime.datetime.now(pytz.timezone('Europe/Madrid'))
-    now_date = now.strftime("%Y-%m-%d")
-    hour_minute_second = now.strftime("%H-%M-%S")
-    now_iso = now.isoformat("T", "seconds")
+    if(os.path.isfile(uploadedJwLibrary)):
+        with zipfile.ZipFile(uploadedJwLibrary, 'r') as zip_ref:
+            zip_ref.extractall("userBackups/{0}/".format(telegram_user)) # TODO: Check if it creates the folder
+        uploadedDb = "userBackups/{0}/userData.db".format(telegram_user)
+        manifestUser = "userBackups/{0}/manifest.json".format(telegram_user)
 
-    dbOriginal = "dbs/userData.db.original"
-    dbFromUser = "dbs/userData-{0}-{1}_{2}.db".format(telegram_user, now_date, hour_minute_second)
-    shutil.copyfile(src=dbOriginal, dst=dbFromUser)
+        j = '{{"name":"jwlibrary-plus-backup_{0}","creationDate":"{1}","version":1,"type":0,"userDataBackup":{{"lastModifiedDate":"{2}","deviceName":"jwlibrary-plus","databaseName":"userData.db","schemaVersion":8}}}}'.format(now_date, now_date, now_iso)
+        manifest = json.loads(j)
 
-    j = '{{"name":"jwlibrary-plus-backup_{0}","creationDate":"{1}","version":1,"type":0,"userDataBackup":{{"lastModifiedDate":"{2}","deviceName":"jwlibrary-plus","databaseName":"userData.db","schemaVersion":8}}}}'.format(now_date, now_date, now_iso)
-    manifest = json.loads(j) #DELETED HASH value b87840c4b4ac4cd30f104b8effc2dd9cc047e135a16658f3814f97fa6b17e3f5 in "j"
+        manifest_file = 'userBackups/{0}/manifest-{0}-{1}.json'.format(telegram_user, now_date)
+        with open(manifest_file, 'w') as f:
+            json.dump(manifest, f)
 
-    manifest_file = 'dbs/manifest-{0}-{1}.json'.format(telegram_user, now_date)
-    with open(manifest_file, 'w') as f:
-        json.dump(manifest, f)
+        connection = sqlite3.connect(uploadedDb)
+        cursor = connection.cursor()
+        cursor.execute("SELECT LocationId FROM Location WHERE DocumentId={0}".format(documentId))
+        locationId = cursor.fetchall()
+        if locationId:
+            locationId = locationId[0][0]
+        else:
+            cursor.execute("SELECT max(LocationId) FROM Location")
+            locationId = cursor.fetchall()[0][0] + 1
+            cursor.execute("""INSERT INTO Location (LocationId, DocumentId, IssueTagNumber, KeySymbol, MepsLanguage, Type, Title)
+            VALUES ({0}, {1}, {2}, "w", 1, 0, "{3}");""".format(locationId, documentId, articleId, title))
+        
+        cursor.execute("SELECT TagId FROM Tag WHERE Name = 'jwlibrary-plus'")
+        tagId = cursor.fetchall()
+        if not tagId:
+            cursor.execute("SELECT max(TagId) FROM Tag")
+            tagId = cursor.fetchall()[0][0] + 1
+            cursor.execute("INSERT INTO Tag ('TagId', 'Type', 'Name') VALUES ('{0}', '1', 'jwlibrary-plus')".format(tagId))
 
-    connection = sqlite3.connect(dbFromUser)
-    cursor = connection.cursor()
+        for i in notes:
+            uuid_value = str(uuid.uuid4())
+            uuid_value2 = str(uuid.uuid4())
 
-    cursor.execute("""INSERT INTO Location (LocationId, DocumentId, IssueTagNumber, KeySymbol, MepsLanguage, Type, Title)
-    VALUES (1, {0}, {1}, "w", 1, 0, "{2}");""".format(documentId, articleId, title))
+            cursor.execute("""INSERT INTO UserMark ('UserMarkId', 'ColorIndex', 'LocationId', 'StyleIndex', 'UserMarkGuid', 'Version')
+            VALUES ('{0}', '2', '1', '0', '{1}', '1');""".format(i+1,uuid_value))
 
-    cursor.execute("INSERT INTO Tag ('TagId', 'Type', 'Name') VALUES ('2', '1', 'jwlibrary-plus')")
+            cursor.execute ("""INSERT INTO "BlockRange" ("BlockRangeId", "BlockType", "Identifier", "StartToken", "EndToken", "UserMarkId")
+            VALUES ('{0}', '1', '{1}', '0', '100', '{2}');""".format(i+1, questions[i].get("data-pid"), i+1))
 
-    for i in notes:
-        uuid_value = str(uuid.uuid4())
-        uuid_value2 = str(uuid.uuid4())
+            cursor.execute("""INSERT INTO Note ("NoteId", "Guid", "UserMarkId", "LocationId", "Title", "Content", "LastModified", "BlockType", "BlockIdentifier") 
+            VALUES ('{0}', '{1}', '{2}', '1', '{3}', '{4}', '{5}', '1', '{6}');""".format(i+1, uuid_value2, i+1, questions[i].text, notes[i].replace("'", '"'), now_iso, questions[i].get("data-pid")))
 
-        cursor.execute("""INSERT INTO UserMark ('UserMarkId', 'ColorIndex', 'LocationId', 'StyleIndex', 'UserMarkGuid', 'Version')
-        VALUES ('{0}', '2', '1', '0', '{1}', '1');""".format(i+1,uuid_value))
+            cursor.execute("INSERT INTO TagMap ('TagMapId', 'NoteId', 'TagId', 'Position') VALUES ('{0}', '{1}', '2', '{2}')".format(i+1,i+1,i))
 
-        cursor.execute ("""INSERT INTO "BlockRange" ("BlockRangeId", "BlockType", "Identifier", "StartToken", "EndToken", "UserMarkId")
-        VALUES ('{0}', '1', '{1}', '0', '100', '{2}');""".format(i+1, questions[i].get("data-pid"), i+1))
+        cursor.execute("UPDATE LastModified SET LastModified = '{0}'".format(now_iso))
 
-        cursor.execute("""INSERT INTO Note ("NoteId", "Guid", "UserMarkId", "LocationId", "Title", "Content", "LastModified", "BlockType", "BlockIdentifier") 
-        VALUES ('{0}', '{1}', '{2}', '1', '{3}', '{4}', '{5}', '1', '{6}');""".format(i+1, uuid_value2, i+1, questions[i].text, notes[i].replace("'", '"'), now_iso, questions[i].get("data-pid")))
+        connection.commit()
+        connection.close()
 
-        cursor.execute("INSERT INTO TagMap ('TagMapId', 'NoteId', 'TagId', 'Position') VALUES ('{0}', '{1}', '2', '{2}')".format(i+1,i+1,i))
+        fileName = "userBackups/{0}/jwlibrary-plus-{1}-{2}.jwlibrary".format(telegram_user, documentId, now_date)
+        zf = zipfile.ZipFile(fileName, "w")
+        zf.write(uploadedDb, arcname= "userData.db") # TODO
+        zf.write(manifest_file, arcname="manifest.json")
+        zf.close()
 
-    cursor.execute("UPDATE LastModified SET LastModified = '{0}'".format(now_iso))
+        os.remove(uploadedDb) # Remove all data from the user except the newly generated .jwlibrary file, which will be deleted after being sent
+        os.remove(manifest_file)
+        os.remove(uploadedJwLibrary)
+        os.remove(manifestUser)
 
-    connection.commit()
-    connection.close()
+    else:
+        now = datetime.datetime.now(pytz.timezone('Europe/Madrid'))
+        now_date = now.strftime("%Y-%m-%d")
+        hour_minute_second = now.strftime("%H-%M-%S")
+        now_iso = now.isoformat("T", "seconds")
 
-    fileName = "jwlibrary-plus-{0}-{1}.jwlibrary".format(documentId, now_date)
-    zf = zipfile.ZipFile(fileName, "w")
-    zf.write(dbFromUser, arcname= "userData.db")
-    zf.write(manifest_file, arcname="manifest.json")
-    zf.close()
+        dbOriginal = "dbs/userData.db.original"
+        dbFromUser = "userBackups/{0}/userData-{0}-{1}_{2}.db".format(telegram_user, now_date, hour_minute_second)
+        shutil.copyfile(src=dbOriginal, dst=dbFromUser)
 
-    os.remove(dbFromUser)    
-    os.remove(manifest_file)
+        j = '{{"name":"jwlibrary-plus-backup_{0}","creationDate":"{1}","version":1,"type":0,"userDataBackup":{{"lastModifiedDate":"{2}","deviceName":"jwlibrary-plus","databaseName":"userData.db","schemaVersion":8}}}}'.format(now_date, now_date, now_iso)
+        manifest = json.loads(j)
+
+        manifest_file = 'userBackups/{0}/manifest-{0}-{1}.json'.format(telegram_user, now_date)
+        with open(manifest_file, 'w') as f:
+            json.dump(manifest, f)
+
+        connection = sqlite3.connect(dbFromUser)
+        cursor = connection.cursor()
+
+        cursor.execute("""INSERT INTO Location (LocationId, DocumentId, IssueTagNumber, KeySymbol, MepsLanguage, Type, Title)
+        VALUES (1, {0}, {1}, "w", 1, 0, "{2}");""".format(documentId, articleId, title))
+
+        cursor.execute("INSERT INTO Tag ('TagId', 'Type', 'Name') VALUES ('2', '1', 'jwlibrary-plus')")
+
+        for i in notes:
+            uuid_value = str(uuid.uuid4())
+            uuid_value2 = str(uuid.uuid4())
+
+            cursor.execute("""INSERT INTO UserMark ('UserMarkId', 'ColorIndex', 'LocationId', 'StyleIndex', 'UserMarkGuid', 'Version')
+            VALUES ('{0}', '2', '1', '0', '{1}', '1');""".format(i+1,uuid_value))
+
+            cursor.execute ("""INSERT INTO "BlockRange" ("BlockRangeId", "BlockType", "Identifier", "StartToken", "EndToken", "UserMarkId")
+            VALUES ('{0}', '1', '{1}', '0', '100', '{2}');""".format(i+1, questions[i].get("data-pid"), i+1))
+
+            cursor.execute("""INSERT INTO Note ("NoteId", "Guid", "UserMarkId", "LocationId", "Title", "Content", "LastModified", "BlockType", "BlockIdentifier") 
+            VALUES ('{0}', '{1}', '{2}', '1', '{3}', '{4}', '{5}', '1', '{6}');""".format(i+1, uuid_value2, i+1, questions[i].text, notes[i].replace("'", '"'), now_iso, questions[i].get("data-pid")))
+
+            cursor.execute("INSERT INTO TagMap ('TagMapId', 'NoteId', 'TagId', 'Position') VALUES ('{0}', '{1}', '2', '{2}')".format(i+1,i+1,i))
+
+        cursor.execute("UPDATE LastModified SET LastModified = '{0}'".format(now_iso))
+
+        connection.commit()
+        connection.close()
+
+        fileName = "userBackups/{0}/jwlibrary-plus-{1}-{2}.jwlibrary".format(telegram_user, documentId, now_date)
+        zf = zipfile.ZipFile(fileName, "w")
+        zf.write(dbFromUser, arcname= "userData.db")
+        zf.write(manifest_file, arcname="manifest.json")
+        zf.close()
+
+        os.remove(dbFromUser)    
+        os.remove(manifest_file)
 
     return fileName
 

@@ -1,3 +1,8 @@
 manifest.json
 userData.db
 *.jwlibrary
+
+# Byte-compiled / optimized / DLL files for Python
+src/__pycache__/
+*.py[cod]
+*$py.class

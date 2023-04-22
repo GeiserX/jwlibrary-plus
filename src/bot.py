@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 import sys
 import core_worker
 from telegram import Update, ForceReply
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -28,13 +28,13 @@ Este bot le ayudará a prepararse las reuniones usando técnicas avanzadas de In
 
 <u>El funcionamiento es el siguiente</u>:
   1. Introduzca la URL de jw.org de la Atalaya que quiera preparar con el comando /url [URL]
-  2. Introduzca las preguntas que quiera hacer. Defina las preguntas y se aplicarán a <b>todos</b> los párrafos, con un máximo de 10. 
-Por defecto, hay 6 preguntas incluidas. Se usa con /q1 [PREGUNTA_1], /q2 [PREGUNTA_2].... Para consultar las preguntas configuradas, usa /showq
-  3. Una vez haya elegido sus parámetros, ejecute /begin y espere unos minutos a que se genere el archivo <code>.jwlibrary</code>
-  4. Descárguelo y restaure esta copia en su app JW Library (Borrará los datos, si no quiere que eso suceda, use una app como Merge JWL)
+  2. Introduzca las preguntas que quiera hacer. Defina las preguntas y se aplicarán a <b>todos</b> los párrafos, con un máximo de 10. Por defecto, hay 6 preguntas incluidas. Se usa con /q1 [PREGUNTA_1], /q2 [PREGUNTA_2].... Para consultar las preguntas configuradas, usa /showq
+  3. Si no quiere perder datos, envíe su archivo de copia de seguridad de su aplicación de JW Library en formato <code>.jwlibrary</code> usando /sendbackup y acto seguido enviando el archivo. Recomendamos que el artículo esté vacío para evitar problemas de posible corrupción de datos.
+  4. Una vez haya elegido sus parámetros, ejecute /begin y espere unos minutos a que se genere el archivo <code>.jwlibrary</code>
+  5. Descárguelo y restaure esta copia en su app JW Library.
 
-Repositorio oficial: https://github.com/DrumSergio/jwlibrary-plus
-Descargo de Responsabilidad: El software aquí presente se ofrece tal cual, sin ninguna garantía.""",
+<u>Repositorio oficial:</u> https://github.com/DrumSergio/jwlibrary-plus
+<u>Descargo de Responsabilidad:</u> El software aquí presente se ofrece tal cual, sin ninguna garantía.""",
         reply_markup=ForceReply(selective=True),)
     
     user_id = update.effective_user.id
@@ -61,7 +61,8 @@ async def url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             connection.commit()
             connection.close()
             title, articleId, articleN = core_worker.extract_html(url,get_all=False)
-            await update.message.reply_html("URL guardada.\nEn esta URL se encuentra la revista del año <b>{0}</b>, número <b>{1}</b>, {2}. El título de la Atalaya es <b>{3}</b>.".format(articleId[:4], articleId[4:-2], articleN.lower(), title))
+            articleNformatted = articleN.lower().split(" ")[-1]
+            await update.message.reply_html("URL guardada.\nEn esta URL se encuentra la revista del año <b>{0}</b>, número <b>{1}</b>, artículo de estudio <b>{2}</b>.\nEl título de la Atalaya es <b>{3}</b>.".format(articleId[:4], articleId[4:-2], articleNformatted, title))
         else:
             await update.message.reply_text("No es un una URL de www.jw.org")
     else:
@@ -78,6 +79,7 @@ async def q1(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
         connection.commit()
         connection.close()
+        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
     else:
         await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
 
@@ -92,6 +94,7 @@ async def q2(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
         connection.commit()
         connection.close()
+        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
     else:
         await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
         
@@ -106,6 +109,7 @@ async def q3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
         connection.commit()
         connection.close()
+        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
     else:
         await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
         
@@ -120,6 +124,7 @@ async def q4(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
         connection.commit()
         connection.close()
+        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
     else:
         await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
         
@@ -134,6 +139,7 @@ async def q5(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
         connection.commit()
         connection.close()
+        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
     else:
         await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
         
@@ -148,6 +154,7 @@ async def q6(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
         connection.commit()
         connection.close()
+        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
     else:
         await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
         
@@ -162,6 +169,7 @@ async def q7(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
         connection.commit()
         connection.close()
+        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
     else:
         await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
         
@@ -176,6 +184,7 @@ async def q8(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
         connection.commit()
         connection.close()
+        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
     else:
         await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
         
@@ -190,6 +199,7 @@ async def q9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
         connection.commit()
         connection.close()
+        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
     else:
         await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
 
@@ -197,13 +207,14 @@ async def q10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     question = ' '.join(context.args[:])
     user = update.effective_user
     logger.info("Q10 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
-    if(len(question) < 150):
+    if(len(question) < 200):
         user_id = update.effective_user.id
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
         cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
         connection.commit()
         connection.close()
+        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
     else:
         await update.message.reply_text("La pregunta debe tener menos de 150 caracteres.")
 
@@ -217,7 +228,7 @@ async def showq(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     cursor.execute("SELECT q1,q2,q3,q4,q5,q6,q7,q8,q9,q10 FROM Main WHERE UserId = {0} LIMIT 1".format(user_id))
     data = cursor.fetchall()[0]
     connection.close()
-    await update.message.reply_text("""Tus preguntas actuales:
+    await update.message.reply_text("""<u>Tus preguntas actuales:</u>
 1. {0}
 2. {1}
 3. {2}
@@ -228,6 +239,23 @@ async def showq(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 8. {7}
 9. {8}
 10. {9}""". format(data[0],data[1],data[2],data[3],data[4],data[5],data[6],data[7],data[8],data[9]))
+
+async def sendbackup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    logger.info("SENDBACKUP - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
+    
+    await update.message.reply_html("Envíe su archivo <code>.jwlibrary</code> a continuación")
+
+async def downloader(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    file = await context.bot.get_file(update.message.document)
+    logger.info("SENDBACKUP - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - File ID: {5} - File Path: {6}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, file.file_id, file.file_path))
+
+    if(file.file_path.endswith(".jwlibrary")):
+        await file.download_to_drive('/app/userBackups/{0}.jwlibrary'.format(user.id))
+        await update.message.reply_text("Archivo correctamente subido y listo para utilizar.")
+    else:
+        await update.message.reply_text("Formato de archivo erróneo.")
 
 async def begin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
@@ -245,8 +273,11 @@ async def begin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     qs = data[2:]
 
     if bool(url) & any(qs): # If URL is in place and there is any question set
-        filename = core_worker.main(url, update.effective_user.id, qs)
-        await update.message.reply_text("Aquí tiene su fichero, impórtelo a JW Library.")
+        filename = core_worker.main(url, user_id, qs) # Call to core_worker.py
+        if(os.path.isfile('userBackups/{0}.jwlibrary'.format(user_id))):
+            await update.message.reply_text("Aquí tiene su fichero, impórtelo a JW Library. Recuerde hacer una <b>copia de seguridad</b> para no perder los datos, ya que no ha proporcionado su archivo .jwlibrary")
+        else:
+            await update.message.reply_text("Aquí tiene su fichero, impórtelo a JW Library. Al haber proporcionado su copia de seguridad, puede estar seguro de que no perderá datos aun si se corrompiera su app, ya que dispone de cómo restaurarla.")
         await update.message.reply_document(document=open(filename, "rb"))
         os.remove(filename)
     else:
@@ -269,6 +300,8 @@ def main() -> None:
     application.add_handler(CommandHandler("q9", q9))
     application.add_handler(CommandHandler("q10", q10))
     application.add_handler(CommandHandler("showq", showq))
+    application.add_handler(CommandHandler("sendbackup", sendbackup))
+    application.add_handler(MessageHandler(filters.Document.ALL, downloader))
     application.add_handler(CommandHandler("begin", begin))
 
     application.run_polling()
