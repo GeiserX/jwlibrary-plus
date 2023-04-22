@@ -1,4 +1,5 @@
-#![img](https://github.com/DrumSergio/jwlibrary-plus/blob/main/extra/logo.jpg?raw=true) JW Library Plus
+![img](https://github.com/DrumSergio/jwlibrary-plus/blob/main/extra/logo.jpg?raw=true)
+# JW Library Plus
 
 [![jwlibrary-plus compliant](https://img.shields.io/github/license/DrumSergio/jwlibrary-plus)](https://github.com/DrumSergio/jwlibrary-plus/blob/main/LICENSE)
 
