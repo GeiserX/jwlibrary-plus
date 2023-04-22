@@ -30,7 +30,7 @@ Este bot le ayudará a prepararse las reuniones usando técnicas avanzadas de In
 <u>El funcionamiento es el siguiente</u>:
   1. Introduzca la URL de jw.org de la Atalaya que quiera preparar con el comando /url [URL]
   2. Introduzca las preguntas que quiera hacer. Defina las preguntas y se aplicarán a <b>todos</b> los párrafos, con un máximo de 10. 
-Por defecto, hay 6 preguntas incluidas. Se usa con /q1 [PREGUNTA_1], /q2 [PREGUNTA_2].... Para consultar las preguntas configuradas, usa /showq
+Por defecto, hay 7 preguntas incluidas. Se usa con /q1 [PREGUNTA_1], /q2 [PREGUNTA_2].... Para consultar las preguntas configuradas, usa /showq
   3. Una vez haya elegido sus parámetros, ejecute /begin y espere unos minutos a que se genere el archivo <code>.jwlibrary</code>
   4. Descárguelo y restaure esta copia en su app JW Library (Borrará los datos, si no quiere que eso suceda, use una app como Merge JWL)
 
@@ -230,8 +230,6 @@ async def showq(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 9. {8}
 10. {9}""". format(data[0],data[1],data[2],data[3],data[4],data[5],data[6],data[7],data[8],data[9]))
 
-
-
 async def begin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info("BEGIN - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
@@ -251,6 +249,7 @@ async def begin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         filename = core_worker.main(url, update.effective_user.id, qs)
         await update.message.reply_text("Aquí tiene su fichero. Impórtelo a JW Library")
         await update.message.reply_document(document=open(filename, "rb"))
+        os.remove(filename)
     else:
         await update.message.reply_text("No ha introducido la URL o todas las preguntas están vacías")
 
@@ -272,7 +271,7 @@ def main() -> None:
     application.add_handler(CommandHandler("q10", q10))
     application.add_handler(CommandHandler("showq", showq))
     application.add_handler(CommandHandler("begin", begin))
-    # Run the bot until the user presses Ctrl-C TODO
+
     application.run_polling()
 
 if __name__ == "__main__":

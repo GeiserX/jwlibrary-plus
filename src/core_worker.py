@@ -152,6 +152,9 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
     zf.write(manifest_file, arcname="manifest.json")
     zf.close()
 
+    os.remove(dbFromUser)    
+    os.remove(manifest_file)
+
     return fileName
 
 def main(url, telegram_user, qs_user) -> None:
