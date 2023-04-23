@@ -20,6 +20,42 @@ from langchain.callbacks import get_openai_callback # TODO
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+#######################################
+### HELPER: DESCRIBE JWLIBRARY FILE ###
+#######################################
+
+def describe_jwlibrary(telegram_user):
+    logger.info("describe_jwlibrary - Telegram User: {0}".format(telegram_user))
+    jwfile = "userBackups/{0}.jwlibrary".format(telegram_user)
+
+    with zipfile.ZipFile(jwfile, 'r') as zip_ref:
+            files = zip_ref.namelist()
+            zip_ref.extractall("userBackups/{0}/".format(telegram_user))
+    
+    uploadedDb = "userBackups/{0}/{1}".format(telegram_user, [zipname for zipname in files if zipname.endswith(".db")][0])
+
+    connection = sqlite3.connect(uploadedDb)
+    cursor = connection.cursor()
+    cursor.execute("SELECT Count(*) FROM Note")
+    notesN = cursor.fetchall()[0][0]
+    cursor.execute("SELECT Count(*) FROM InputField")
+    inputN = cursor.fetchall()[0][0]
+    cursor.execute("SELECT Count(*) FROM TagMap")
+    tagMaptN = cursor.fetchall()[0][0]
+    cursor.execute("SELECT Count(*) FROM Tag")
+    tagN = cursor.fetchall()[0][0]
+    cursor.execute("SELECT Count(*) FROM Bookmark")
+    bookmarkN = cursor.fetchall()[0][0]
+    cursor.execute("SELECT LastModified FROM LastModified")
+    lastModified = cursor.fetchall()[0][0]
+    cursor.execute("SELECT Count(*) FROM UserMark")
+    userMarkN = cursor.fetchall()[0][0]
+    connection.close()
+
+    shutil.rmtree("userBackups/{0}/".format(telegram_user))
+
+    return notesN, inputN, tagMaptN, tagN, bookmarkN, lastModified, userMarkN
+
 #############################
 ### BEGIN EXTRACTING HTML ###
 #############################
@@ -59,7 +95,7 @@ def extract_html(url, get_all):
 ### BEGIN QUERY OPENAI ###
 ##########################
 def query_openai(title, base_text, song, summary, q_map, qs_user):
-    logger.info("query_openai  - Title: {0} - Base Text: {1} - Song: {2} - Summary: {3} - Questions Map: {4} - Questions User: {5}".format(title, base_text, song, summary, q_map, qs_user))
+    logger.info("query_openai  - Title: {0} - Base Text: {1} - Song: {2} - Summary: {3} - Questions User: {4}".format(title, base_text, song, summary, qs_user))
     langchain.llm_cache = SQLiteCache(database_path="dbs/langchain.db")
 
     questions = [f"{i}. {question}" for i, question in enumerate(qs_user, start=1) if question]
@@ -114,8 +150,10 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
     if(os.path.isfile(uploadedJwLibrary)):
         logger.info("Archivo .jwlibrary encontrado")
         with zipfile.ZipFile(uploadedJwLibrary, 'r') as zip_ref:
-            zip_ref.extractall("userBackups/{0}/".format(telegram_user)) # TODO: Check if it creates the folder
-        uploadedDb = "userBackups/{0}/userData.db".format(telegram_user)
+            files = zip_ref.namelist()
+            zip_ref.extractall("userBackups/{0}/".format(telegram_user))
+        
+        uploadedDb = "userBackups/{0}/{1}".format(telegram_user, [zipname for zipname in files if zipname.endswith(".db")][0])
         manifestUser = "userBackups/{0}/manifest.json".format(telegram_user)
 
         manifest_file = 'userBackups/{0}/manifest-{0}-{1}.json'.format(telegram_user, now_date)
