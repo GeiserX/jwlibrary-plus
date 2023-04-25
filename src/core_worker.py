@@ -6,7 +6,7 @@ import zipfile
 import logging
 import requests
 import json
-import datetime
+from datetime import datetime, timedelta
 import sqlite3
 from bs4 import BeautifulSoup
 import langchain
@@ -60,40 +60,53 @@ def describe_jwlibrary(telegram_user):
 ### BEGIN EXTRACTING HTML ###
 #############################
 
-def extract_html(url, get_all):
-    logger.info("extract_html - URL: {0} - Full Run: {1}".format(url, get_all))
+def extract_html(date, url, get_all):
+    logger.info("extract_html - Date: {0} - URL: {1} - Full Run: {2}".format(date=date, url=url, get_all=get_all))
 
-    html = requests.get(url).text
-    soup = BeautifulSoup(html, features="html5lib")
-    title = soup.find("h1").text
-    classArticleId = soup.find("article", {"id" : "article"}).get("class")
-    articleId = next(x for x in classArticleId if x.startswith("iss"))[4:] + "00"
-    articleN = soup.find("p", {"id":"p1"}).text
+    if date:
+        # now = datetime.now(pytz.timezone('Europe/Madrid')) # TODO: Change to UTC?
+        # pickup_date = (now + timedelta(days=7*date)).strftime("%Y/%V")
 
-    if get_all:
-        base_text = soup.find("p", {"id":"p3"}).text
-        song = soup.find("p",{"id":"p4"}).text
-        summary = soup.find("div", {"id": "footnote1"}).find("p").text
-        documentId = soup.find("input", {"name": "docid"}).get("value")
-        p_elements = soup.find("div", {"class":"bodyTxt"})
-        questions = p_elements.find_all("p", {"id": lambda x: x and x.startswith("q")})
-        paragraphs = p_elements.find_all("p", {"id": lambda x: x and x.startswith("p")})
+        # html = requests.get("https://0}".format(pickup_date)).text
+        # soup = BeautifulSoup(html, features="html.parser")
+        # articleURL = soup.find("div", {"class": "groupTOC"}).find("a",{"class": "it"}).get("href")
+  
 
-        # Example q_map = {0 : [q1, [p1]], 1 : [q2&3, [p2, p3]]}
-        q_map = {}
-        i = 0
-        for q in questions:
-            q_map[i] = [q]
-            q_map[i].append([p for p in paragraphs if p.has_attr('data-rel-pid') if p.get('data-rel-pid').strip('[]') in q.get('data-pid')])
-            i = i+1
-        
-        return title, base_text, song, summary, questions, documentId, articleId, q_map
+        # TODO https://www.jw.org/es/biblioteca/revistas/atalaya-estudio-julio-2022/ "div class docClass-40" y "p class adDesc"
+
     else:
-        return title, articleId, articleN
+        html = requests.get(url).text
+        soup = BeautifulSoup(html, features="html5lib")
+        title = soup.find("h1").text
+        classArticleId = soup.find("article", {"id" : "article"}).get("class")
+        articleId = next(x for x in classArticleId if x.startswith("iss"))[4:] + "00"
+        articleN = soup.find("p", {"id":"p1"}).text
+
+        if get_all:
+            base_text = soup.find("p", {"id":"p3"}).text
+            song = soup.find("p",{"id":"p4"}).text
+            summary = soup.find("div", {"id": "footnote1"}).find("p").text
+            documentId = soup.find("input", {"name": "docid"}).get("value")
+            p_elements = soup.find("div", {"class":"bodyTxt"})
+            questions = p_elements.find_all("p", {"id": lambda x: x and x.startswith("q")})
+            paragraphs = p_elements.find_all("p", {"id": lambda x: x and x.startswith("p")})
+
+            # Example q_map = {0 : [q1, [p1]], 1 : [q2&3, [p2, p3]]}
+            q_map = {}
+            i = 0
+            for q in questions:
+                q_map[i] = [q]
+                q_map[i].append([p for p in paragraphs if p.has_attr('data-rel-pid') if p.get('data-rel-pid').strip('[]') in q.get('data-pid')])
+                i = i+1
+            
+            return title, base_text, song, summary, questions, documentId, articleId, q_map
+        else:
+            return title, articleId, articleN
 
 ##########################
 ### BEGIN QUERY OPENAI ###
 ##########################
+
 def query_openai(title, base_text, song, summary, q_map, qs_user):
     logger.info("query_openai  - Title: {0} - Base Text: {1} - Song: {2} - Summary: {3} - Questions User: {4}".format(title, base_text, song, summary, qs_user))
     langchain.llm_cache = SQLiteCache(database_path="dbs/langchain.db")
@@ -111,7 +124,7 @@ La Atalaya de esta semana se titula {0}, se basa en el texto de {1}, cantaremos 
 {3}
 Para cada pregunta y párrafo o párrafos que te vaya enviando a partir de ahora, responderás en una lista lo siguiente:
 {4}
-No escribas estas preguntas de nuevo en la respuesta. Separa las respuestas con un espacio en blanco.""".format(title, base_text, song, summary, questions_text)),
+No escribas estas preguntas de nuevo en la respuesta. Separa las respuestas con dos retornos de carro.""".format(title, base_text, song, summary, questions_text)),
         MessagesPlaceholder(variable_name="history"),
         HumanMessagePromptTemplate.from_template("{input}")
     ])
@@ -139,7 +152,7 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
     logger.info("write_jwlibrary - Document ID: {0} - Article ID: {1} - Title: {2} - Questions: {3} - Notes: {4} - Telegram User: {5}".format(documentId, articleId, title, questions, notes, telegram_user))
     uploadedJwLibrary = 'userBackups/{0}.jwlibrary'.format(telegram_user)
 
-    now = datetime.datetime.now(pytz.timezone('Europe/Madrid'))
+    now = datetime.now(pytz.timezone('Europe/Madrid'))
     now_date = now.strftime("%Y-%m-%d")
     hour_minute_second = now.strftime("%H-%M-%S")
     now_iso = now.isoformat("T", "seconds")
@@ -308,7 +321,7 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
 
 def main(url, telegram_user, qs_user) -> None:
 
-    title, base_text, song, summary, questions, documentId, articleId, q_map = extract_html(url, get_all=True)
+    title, base_text, song, summary, questions, documentId, articleId, q_map = extract_html(date, url, get_all=True)
     notes = query_openai(title, base_text, song, summary, q_map, qs_user)
     filename = write_jwlibrary(documentId, articleId, title, questions, notes, telegram_user)
     

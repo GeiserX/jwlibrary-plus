@@ -1,2 +1,4 @@
 dbs/langchain.db
 dbs/main.db
+local_dev
+local_dev/*

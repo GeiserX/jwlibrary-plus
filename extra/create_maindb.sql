@@ -1,6 +1,7 @@
 CREATE TABLE Main (
 	UserId  INTEGER NOT NULL PRIMARY KEY,
     Url     TEXT,
+    Date    TEXT,
     q1      TEXT,
     q2      TEXT,
     q3      TEXT,
