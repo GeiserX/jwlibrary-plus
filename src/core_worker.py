@@ -60,48 +60,36 @@ def describe_jwlibrary(telegram_user):
 ### BEGIN EXTRACTING HTML ###
 #############################
 
-def extract_html(date, url, get_all):
-    logger.info("extract_html - Date: {0} - URL: {1} - Full Run: {2}".format(date=date, url=url, get_all=get_all))
+def extract_html(url, get_all):
+    logger.info("extract_html - URL: {0} - Full Run: {1}".format(url, get_all))
 
-    if date:
-        # now = datetime.now(pytz.timezone('Europe/Madrid')) # TODO: Change to UTC?
-        # pickup_date = (now + timedelta(days=7*date)).strftime("%Y/%V")
+    html = requests.get(url).text
+    soup = BeautifulSoup(html, features="html5lib")
+    title = soup.find("h1").text
+    classArticleId = soup.find("article", {"id" : "article"}).get("class")
+    articleId = next(x for x in classArticleId if x.startswith("iss"))[4:] + "00"
+    articleN = soup.find("p", {"id":"p1"}).text
 
-        # html = requests.get("https://0}".format(pickup_date)).text
-        # soup = BeautifulSoup(html, features="html.parser")
-        # articleURL = soup.find("div", {"class": "groupTOC"}).find("a",{"class": "it"}).get("href")
-  
+    if get_all:
+        base_text = soup.find("p", {"id":"p3"}).text
+        song = soup.find("p",{"id":"p4"}).text
+        summary = soup.find("div", {"id": "footnote1"}).find("p").text
+        documentId = soup.find("input", {"name": "docid"}).get("value")
+        p_elements = soup.find("div", {"class":"bodyTxt"})
+        questions = p_elements.find_all("p", {"id": lambda x: x and x.startswith("q")})
+        paragraphs = p_elements.find_all("p", {"id": lambda x: x and x.startswith("p")})
 
-        # TODO https://www.jw.org/es/biblioteca/revistas/atalaya-estudio-julio-2022/ "div class docClass-40" y "p class adDesc"
-
+        # Example q_map = {0 : [q1, [p1]], 1 : [q2&3, [p2, p3]]}
+        q_map = {}
+        i = 0
+        for q in questions:
+            q_map[i] = [q]
+            q_map[i].append([p for p in paragraphs if p.has_attr('data-rel-pid') if p.get('data-rel-pid').strip('[]') in q.get('data-pid')])
+            i = i+1
+        
+        return title, base_text, song, summary, questions, documentId, articleId, q_map
     else:
-        html = requests.get(url).text
-        soup = BeautifulSoup(html, features="html5lib")
-        title = soup.find("h1").text
-        classArticleId = soup.find("article", {"id" : "article"}).get("class")
-        articleId = next(x for x in classArticleId if x.startswith("iss"))[4:] + "00"
-        articleN = soup.find("p", {"id":"p1"}).text
-
-        if get_all:
-            base_text = soup.find("p", {"id":"p3"}).text
-            song = soup.find("p",{"id":"p4"}).text
-            summary = soup.find("div", {"id": "footnote1"}).find("p").text
-            documentId = soup.find("input", {"name": "docid"}).get("value")
-            p_elements = soup.find("div", {"class":"bodyTxt"})
-            questions = p_elements.find_all("p", {"id": lambda x: x and x.startswith("q")})
-            paragraphs = p_elements.find_all("p", {"id": lambda x: x and x.startswith("p")})
-
-            # Example q_map = {0 : [q1, [p1]], 1 : [q2&3, [p2, p3]]}
-            q_map = {}
-            i = 0
-            for q in questions:
-                q_map[i] = [q]
-                q_map[i].append([p for p in paragraphs if p.has_attr('data-rel-pid') if p.get('data-rel-pid').strip('[]') in q.get('data-pid')])
-                i = i+1
-            
-            return title, base_text, song, summary, questions, documentId, articleId, q_map
-        else:
-            return title, articleId, articleN
+        return title, articleId, articleN
 
 ##########################
 ### BEGIN QUERY OPENAI ###
@@ -151,6 +139,8 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
 
     logger.info("write_jwlibrary - Document ID: {0} - Article ID: {1} - Title: {2} - Questions: {3} - Notes: {4} - Telegram User: {5}".format(documentId, articleId, title, questions, notes, telegram_user))
     uploadedJwLibrary = 'userBackups/{0}.jwlibrary'.format(telegram_user)
+
+    os.makedirs(os.path.dirname("userBackups/{telegram_user}"), exist_ok=True)
 
     now = datetime.now(pytz.timezone('Europe/Madrid'))
     now_date = now.strftime("%Y-%m-%d")
@@ -321,7 +311,7 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
 
 def main(url, telegram_user, qs_user) -> None:
 
-    title, base_text, song, summary, questions, documentId, articleId, q_map = extract_html(date, url, get_all=True)
+    title, base_text, song, summary, questions, documentId, articleId, q_map = extract_html(url, get_all=True)
     notes = query_openai(title, base_text, song, summary, q_map, qs_user)
     filename = write_jwlibrary(documentId, articleId, title, questions, notes, telegram_user)
     
