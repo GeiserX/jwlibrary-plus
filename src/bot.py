@@ -19,11 +19,8 @@ logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 init_questions=["Una ilustración o ejemplo para explicar algún punto principal del párrafo",
-                "Una experiencia en concreto, aportando referencias exactas, que esté muy relacionada con el párrafo",
-                "¿Qué me enseña este párrafo sobre Jehová?",
-                "Una explicación sobre uno de los textos que aparezcan, que aplique al párrafo. Usa la Biblia de Estudio de los Testigos de Jehová.",
-                "¿Cómo poner en práctica el contenido del párrafo?",
-                "Algún comentario adicional que no responda la pregunta principal y que sea de utilidad"]
+                "Una experiencia en concreto, aportando referencias exactas de jw.org, que esté muy relacionada con el párrafo",
+                "Una explicación sobre uno de los textos que aparezcan, que aplique al párrafo. Usa la Biblia de Estudio de los Testigos de Jehová"]
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
@@ -34,13 +31,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 Este bot le ayudará a prepararse las reuniones usando técnicas avanzadas de Inteligencia Artificial, aplicadas especialmente a la relación de datos en la literatura de la organización.
 
 <u>El funcionamiento es el siguiente</u>:
-  1. Introduzca la URL de jw.org de la Atalaya que quiera preparar con el comando /url [URL]
-  2. Introduzca las preguntas que quiera hacer. Defina las preguntas y se aplicarán a <b>todos</b> los párrafos, con un máximo de 10. Por defecto, hay 6 preguntas incluidas. Se usa con /q1 [PREGUNTA_1], /q2 [PREGUNTA_2].... Para consultar las preguntas configuradas, usa /show_q
+  1. Introduzca la  fecha de la Atalaya que quiera preparar con el comando /select_date. Como alternativa, también existe la opción de proporcionar una URL de la propia Atalaya mediante /url [URL]
+  2. Introduzca las preguntas que quiera hacer. Defina las preguntas y se aplicarán a <b>todos</b> los párrafos, con un máximo de 10. Por defecto, hay 3 preguntas incluidas. Se usa con /q1 [PREGUNTA_1], /q2 [PREGUNTA_2].... Para consultar las preguntas configuradas, usa /show_q
   3. Si no quiere perder datos, envíe su archivo de copia de seguridad de su aplicación de JW Library en formato <code>.jwlibrary</code> usando /send_backup y acto seguido enviando el archivo. Recomendamos que el artículo que quiera prepararse esté vacío para evitar problemas de posible corrupción de datos.
   4. Una vez haya elegido sus parámetros, ejecute /compute y espere unos minutos a que se genere el archivo <code>.jwlibrary</code>
   5. Descárguelo y restaure esta copia en su app JW Library.
 
-<u>Repositorio oficial:</u> https://github.com/DrumSergio/jwlibrary-plus
+<u>Repositorio oficial:</u> https://github.com/GeiserX/jwlibrary-plus
 <u>Descargo de Responsabilidad:</u> El software aquí presente se ofrece tal cual, sin ninguna garantía.
 <u>Nota Importante:</u> Cada vez que ejecute /start , sus preguntas guardadas se <b>borrarán</b> y comenzará con las que el software ofrece por defecto.""")
     
@@ -48,7 +45,7 @@ Este bot le ayudará a prepararse las reuniones usando técnicas avanzadas de In
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
     cursor.execute("INSERT OR IGNORE INTO Main (UserId) VALUES ({0})".format(user_id))
-    cursor.execute("UPDATE Main SET q1 = '{0}', q2 = '{1}', q3 = '{2}', q4 = '{3}', q5 = '{4}', q6 = '{5}', q7 = null, q8 = null, q9 = null, q10 = null WHERE UserId = {6}".format(init_questions[0], init_questions[1], init_questions[2], init_questions[3], init_questions[4], init_questions[5], user_id))
+    cursor.execute("UPDATE Main SET q1 = '{0}', q2 = '{1}', q3 = '{2}', q4 = null, q5 = null, q6 = null, q7 = null, q8 = null, q9 = null, q10 = null WHERE UserId = {3}".format(init_questions[0], init_questions[1], init_questions[2], user_id))
     connection.commit()
     connection.close()
 
@@ -82,14 +79,16 @@ async def q1(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info("Q1 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
     if(len(question) < 200):
         user_id = update.effective_user.id
+        function_name = sys._getframe().f_code.co_name
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
-        cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
+        cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user_id))
         connection.commit()
         connection.close()
-        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
+        await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
     else:
         await update.message.reply_text("La pregunta debe tener menos de 200 caracteres")
+
 
 
 async def q2(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -98,12 +97,18 @@ async def q2(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info("Q2 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
     if(len(question) < 200):
         user_id = update.effective_user.id
+        function_name = sys._getframe().f_code.co_name
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
-        cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
-        connection.commit()
-        connection.close()
-        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
+        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user_id))
+        prev_q = cursor.fetchall()
+        if(prev_q == [(None,)] or prev_q == []):
+            await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
+        else:
+            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user_id))
+            connection.commit()
+            connection.close()
+            await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
     else:
         await update.message.reply_text("La pregunta debe tener menos de 200 caracteres")
         
@@ -114,12 +119,18 @@ async def q3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info("Q3 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
     if(len(question) < 200):
         user_id = update.effective_user.id
+        function_name = sys._getframe().f_code.co_name
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
-        cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
-        connection.commit()
-        connection.close()
-        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
+        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user_id))
+        prev_q = cursor.fetchall()
+        if(prev_q == [(None,)] or prev_q == []):
+            await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
+        else:
+            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user_id))
+            connection.commit()
+            connection.close()
+            await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
     else:
         await update.message.reply_text("La pregunta debe tener menos de 200 caracteres")
         
@@ -130,12 +141,18 @@ async def q4(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info("Q4 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
     if(len(question) < 200):
         user_id = update.effective_user.id
+        function_name = sys._getframe().f_code.co_name
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
-        cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
-        connection.commit()
-        connection.close()
-        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
+        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user_id))
+        prev_q = cursor.fetchall()
+        if(prev_q == [(None,)] or prev_q == []):
+            await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
+        else:
+            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user_id))
+            connection.commit()
+            connection.close()
+            await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
     else:
         await update.message.reply_text("La pregunta debe tener menos de 200 caracteres")
         
@@ -146,12 +163,18 @@ async def q5(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info("Q5 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
     if(len(question) < 200):
         user_id = update.effective_user.id
+        function_name = sys._getframe().f_code.co_name
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
-        cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
-        connection.commit()
-        connection.close()
-        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
+        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user_id))
+        prev_q = cursor.fetchall()
+        if(prev_q == [(None,)] or prev_q == []):
+            await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
+        else:
+            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user_id))
+            connection.commit()
+            connection.close()
+            await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
     else:
         await update.message.reply_text("La pregunta debe tener menos de 200 caracteres")
         
@@ -162,12 +185,18 @@ async def q6(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info("Q6 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
     if(len(question) < 200):
         user_id = update.effective_user.id
+        function_name = sys._getframe().f_code.co_name
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
-        cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
-        connection.commit()
-        connection.close()
-        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
+        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user_id))
+        prev_q = cursor.fetchall()
+        if(prev_q == [(None,)] or prev_q == []):
+            await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
+        else:
+            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user_id))
+            connection.commit()
+            connection.close()
+            await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
     else:
         await update.message.reply_text("La pregunta debe tener menos de 200 caracteres")
         
@@ -178,12 +207,18 @@ async def q7(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info("Q7 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
     if(len(question) < 200):
         user_id = update.effective_user.id
+        function_name = sys._getframe().f_code.co_name
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
-        cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
-        connection.commit()
-        connection.close()
-        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
+        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user_id))
+        prev_q = cursor.fetchall()
+        if(prev_q == [(None,)] or prev_q == []):
+            await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
+        else:
+            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user_id))
+            connection.commit()
+            connection.close()
+            await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
     else:
         await update.message.reply_text("La pregunta debe tener menos de 200 caracteres")
         
@@ -194,12 +229,18 @@ async def q8(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info("Q8 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
     if(len(question) < 200):
         user_id = update.effective_user.id
+        function_name = sys._getframe().f_code.co_name
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
-        cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
-        connection.commit()
-        connection.close()
-        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
+        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user_id))
+        prev_q = cursor.fetchall()
+        if(prev_q == [(None,)] or prev_q == []):
+            await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
+        else:
+            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user_id))
+            connection.commit()
+            connection.close()
+            await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
     else:
         await update.message.reply_text("La pregunta debe tener menos de 200 caracteres")
 
@@ -210,12 +251,18 @@ async def q9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info("Q9 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
     if(len(question) < 200):
         user_id = update.effective_user.id
+        function_name = sys._getframe().f_code.co_name
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
-        cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
-        connection.commit()
-        connection.close()
-        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
+        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user_id))
+        prev_q = cursor.fetchall()
+        if(prev_q == [(None,)] or prev_q == []):
+            await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
+        else:
+            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user_id))
+            connection.commit()
+            connection.close()
+            await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
     else:
         await update.message.reply_text("La pregunta debe tener menos de 200 caracteres")
 
@@ -226,12 +273,18 @@ async def q10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info("Q10 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
     if(len(question) < 200):
         user_id = update.effective_user.id
+        function_name = sys._getframe().f_code.co_name
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
-        cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(sys._getframe().f_code.co_name, question, user_id))
-        connection.commit()
-        connection.close()
-        await update.message.reply_text("Pregunta {0} guardada correctamente".format(sys._getframe().f_code.co_name[1:]))
+        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user_id))
+        prev_q = cursor.fetchall()
+        if(prev_q == [(None,)] or prev_q == []):
+            await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
+        else:
+            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user_id))
+            connection.commit()
+            connection.close()
+            await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
     else:
         await update.message.reply_text("La pregunta debe tener menos de 200 caracteres")
 
