@@ -31,9 +31,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 Este bot le ayudará a prepararse las reuniones usando técnicas avanzadas de Inteligencia Artificial, aplicadas especialmente a la relación de datos en la literatura de la organización.
 
 <u>El funcionamiento es el siguiente</u>:
-  1. Introduzca la  fecha de la Atalaya que quiera preparar con el comando /select_date. Como alternativa, también existe la opción de proporcionar una URL de la propia Atalaya mediante /url [URL]
-  2. Introduzca las preguntas que quiera hacer. Defina las preguntas y se aplicarán a <b>todos</b> los párrafos, con un máximo de 10. Por defecto, hay 3 preguntas incluidas. Se usa con /q1 [PREGUNTA_1], /q2 [PREGUNTA_2].... Para consultar las preguntas configuradas, usa /show_q
-  3. Si no quiere perder datos, envíe su archivo de copia de seguridad de su aplicación de JW Library en formato <code>.jwlibrary</code> usando /send_backup y acto seguido enviando el archivo. Recomendamos que el artículo que quiera prepararse esté vacío para evitar problemas de posible corrupción de datos.
+  1. Introduzca la  fecha de la Atalaya que quiera preparar con el comando /date_select. Como alternativa, también existe la opción de proporcionar una URL de la propia Atalaya mediante /url_select [URL]
+  2. Introduzca las preguntas que quiera hacer. Defina las preguntas y se aplicarán a <b>todos</b> los párrafos, con un máximo de 10. Por defecto, hay 3 preguntas incluidas. Se usa con /q1 [PREGUNTA_1], /q2 [PREGUNTA_2].... Para consultar las preguntas configuradas, usa /q_show
+  3. Si no quiere perder datos, envíe su archivo de copia de seguridad de su aplicación de JW Library en formato <code>.jwlibrary</code> usando /backup_send y acto seguido enviando el archivo. Recomendamos que el artículo que quiera prepararse esté vacío para evitar problemas de posible corrupción de datos.
   4. Una vez haya elegido sus parámetros, ejecute /compute y espere unos minutos a que se genere el archivo <code>.jwlibrary</code>
   5. Descárguelo y restaure esta copia en su app JW Library.
 
@@ -324,7 +324,7 @@ async def delete_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def bulk_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None: # Not working because there is no \n in input
     logger.info(context.args)
     user = update.effective_user
-    questions_user = update.effective_message.text.removeprefix("/bulk_q")
+    questions_user = update.effective_message.text.removeprefix("/q_bulk")
     #questions_user = ' '.join(context.args[:]).replace('"', '').replace("'", "").replace(";", "").replace("(", "").replace(")", "") # TODO: Prevent user from messing with the input
     logger.info("BULK_Q - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Questions from User: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, questions_user))
     
@@ -473,7 +473,7 @@ async def show_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     date = cursor.fetchall()[0][0]
     connection.close()
 
-    if date:
+    if str(date):
         await update.message.reply_html("La semana configurada es la {0}".format(date)) # TODO: Actualmente solo responde 0, 1 ,2 o 3 dependiendo de la semana
     else:
         await update.message.reply_text("No hay semana configurada")
@@ -498,7 +498,7 @@ async def delete_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 async def compute(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    logger.info("BEGIN - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
+    logger.info("COMPUTE - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
 
     await update.message.reply_text("Inicializando. Por favor, espere")
     user_id = update.effective_user.id
@@ -516,7 +516,7 @@ async def compute(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if any(qs):
         if url and str(date):
-            await update.message.reply_text("Tiene guardados una fecha y una URL. Se tomará la fecha como predeterminado. Si quiere usar la URL, borre la fecha con /delete_date")
+            await update.message.reply_text("Tiene guardados una fecha y una URL. Se está tomando la fecha como valor predeterminado. Si quiere usar la URL, borre la fecha con /date_delete")
         if str(date):
             now = datetime.now(pytz.timezone('Europe/Madrid')) # TODO: Check if UTC better
             start_date = now - timedelta(days=now.weekday()) + timedelta(date*7)
@@ -535,16 +535,17 @@ async def compute(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             connection = sqlite3.connect("dbs/catalog.db")
             cursor = connection.cursor()
             cursor.execute("SELECT * FROM DatedText WHERE Class = 68 AND (Start = '{0}' OR Start = '{1}' OR Start = '{2}' OR Start = '{3}' OR Start = '{4}')".format(dates[0], dates[1], dates[2], dates[3], dates[4]))
-            datas = cursor.fetchall()
+            dates_catalog = cursor.fetchall()
 
-            list_of_dates = [datetime.strptime(x[1],"%Y-%m-%d") for x in datas] 
+            list_of_dates = [datetime.strptime(x[1],"%Y-%m-%d") for x in dates_catalog] 
    
-            newest_date = min(list_of_dates).strftime("%Y-%m-%d")
+            newest_date = max(list_of_dates).strftime("%Y-%m-%d")
             delta_start_week_found = dates.index(newest_date)
-            possiblePubId = [str(x[3]) for x in datas if x[1] == newest_date]
+            possiblePubId = [str(x[3]) for x in dates_catalog if x[1] == newest_date]
 
             cursor.execute("SELECT PublicationRootKeyId, IssueTagNumber, Symbol, Title, IssueTitle, Year, Id FROM Publication WHERE MepsLanguageId = 1 AND Id IN ({0})".format(', '.join(possiblePubId)))
             publication = cursor.fetchall()
+            cursor.close() # No need to commit anything
 
             lang = "S" # TODO: Get language list
             year = publication[0][5]
@@ -576,28 +577,25 @@ async def compute(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text("Todas las preguntas están vacías")
 
 
-
-
-
 def main() -> None:
 
     application = Application.builder().token(os.environ["TOKEN"]).build()
 
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("url", select_url))
-    application.add_handler(CommandHandler("show_q", show_q))
-    application.add_handler(CommandHandler("delete_q", delete_q))
-    application.add_handler(CommandHandler("bulk_q", bulk_q)) # TODO: No funciona \n
-    application.add_handler(CommandHandler("send_backup", send_backup))
+    application.add_handler(CommandHandler("url_select", select_url))
+    application.add_handler(CommandHandler("q_show", show_q))
+    application.add_handler(CommandHandler("q_delete", delete_q))
+    application.add_handler(CommandHandler("q_bulk", bulk_q))
+    application.add_handler(CommandHandler("backup_send", send_backup))
     application.add_handler(MessageHandler(filters.Document.ALL, downloader))
-    application.add_handler(CommandHandler("describe_backup", describe_backup))
-    application.add_handler(CommandHandler("delete_backup", delete_backup))
-    application.add_handler(CommandHandler("show_url", show_url))
-    application.add_handler(CommandHandler("delete_url", delete_url))
-    application.add_handler(CommandHandler("select_date", select_date))
+    application.add_handler(CommandHandler("backup_describe", describe_backup))
+    application.add_handler(CommandHandler("backup_delete", delete_backup))
+    application.add_handler(CommandHandler("url_show", show_url))
+    application.add_handler(CommandHandler("url_delete", delete_url))
+    application.add_handler(CommandHandler("date_select", select_date))
     application.add_handler(CallbackQueryHandler(select_date_button))
-    application.add_handler(CommandHandler("show_date", show_date))
-    application.add_handler(CommandHandler("delete_date", delete_date))
+    application.add_handler(CommandHandler("date_show", show_date))
+    application.add_handler(CommandHandler("date_delete", delete_date))
     # TODO: Hacer filter para URL pillar todo
     application.add_handler(CommandHandler("compute", compute))
 

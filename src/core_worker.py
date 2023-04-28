@@ -140,7 +140,7 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
     logger.info("write_jwlibrary - Document ID: {0} - Article ID: {1} - Title: {2} - Questions: {3} - Notes: {4} - Telegram User: {5}".format(documentId, articleId, title, questions, notes, telegram_user))
     uploadedJwLibrary = 'userBackups/{0}.jwlibrary'.format(telegram_user)
 
-    os.makedirs(os.path.dirname("userBackups/{telegram_user}"), exist_ok=True)
+    os.makedirs("/app/userBackups/{0}".format(telegram_user), exist_ok=True)
 
     now = datetime.now(pytz.timezone('Europe/Madrid'))
     now_date = now.strftime("%Y-%m-%d")
