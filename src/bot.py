@@ -309,12 +309,12 @@ async def delete_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     connection.commit()
     connection.close()
 
-    await update.message.reply_html("Todas las preguntas han sido eliminadas")
+    await update.message.reply_html("Todas las preguntas que estaban guardadas han sido eliminadas")
 
 async def bulk_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None: # Not working because there is no \n in input
     logger.info(context.args)
     user = update.effective_user
-    questions_user = update.effective_message.text.removeprefix("/q_bulk").replace('"', '').replace("'", "").replace(";", "").replace("(", "").replace(")", "") # TODO: Prevent user from messing with the input
+    questions_user = update.effective_message.text.removeprefix("/q_bulk").removeprefix("@jwlibrary_plus_dev_bot").replace('"', '').replace("'", "").replace(";", "").replace("(", "").replace(")", "") # TODO: Prevent user from messing with the input
     logger.info("BULK_Q - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Questions from User: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, questions_user))
     
     await delete_q(update, context)
@@ -330,7 +330,7 @@ async def bulk_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None: # 
     connection.commit()
     connection.close()
 
-    await update.message.reply_text("Serie de preguntas guardadas con éxito")
+    await update.message.reply_text("La serie de preguntas introducida ha sido guardada con éxito")
 
 async def send_backup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
