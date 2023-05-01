@@ -12,6 +12,7 @@ import validators
 from urllib.parse import urlparse
 import sys
 import core_worker
+from collections import Counter
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters, CallbackQueryHandler
 
@@ -41,11 +42,11 @@ Este bot le ayudará a prepararse las reuniones usando técnicas avanzadas de In
 <u>Descargo de Responsabilidad:</u> El software aquí presente se ofrece tal cual, sin ninguna garantía.
 <u>Nota Importante:</u> Cada vez que ejecute /start , sus preguntas guardadas se <b>borrarán</b> y comenzará con las que el software ofrece por defecto.""")
     
-    user_id = update.effective_user.id
+    
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
-    cursor.execute("INSERT OR IGNORE INTO Main (UserId) VALUES ({0})".format(user_id))
-    cursor.execute("UPDATE Main SET q1 = '{0}', q2 = '{1}', q3 = '{2}', q4 = null, q5 = null, q6 = null, q7 = null, q8 = null, q9 = null, q10 = null WHERE UserId = {3}".format(init_questions[0], init_questions[1], init_questions[2], user_id))
+    cursor.execute("INSERT OR IGNORE INTO Main (UserId) VALUES ({0})".format(user.id))
+    cursor.execute("UPDATE Main SET q1 = '{0}', q2 = '{1}', q3 = '{2}', q4 = null, q5 = null, q6 = null, q7 = null, q8 = null, q9 = null, q10 = null WHERE UserId = {3}".format(init_questions[0], init_questions[1], init_questions[2], user.id))
     connection.commit()
     connection.close()
 
@@ -58,10 +59,9 @@ async def select_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if(validators.url(url)):
         u = urlparse(url)
         if(u.netloc == "www.jw.org"):
-            user_id = update.effective_user.id
             connection = sqlite3.connect("dbs/main.db")
             cursor = connection.cursor()
-            cursor.execute("UPDATE Main SET Url = '{0}' WHERE UserId = {1}".format(url, user_id))
+            cursor.execute("UPDATE Main SET Url = '{0}' WHERE UserId = {1}".format(url, user.id))
             connection.commit()
             connection.close()
             title, articleId, articleN = core_worker.extract_html(url, get_all=False)
@@ -78,11 +78,10 @@ async def q1(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info("Q1 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
     if(len(question) < 200):
-        user_id = update.effective_user.id
         function_name = sys._getframe().f_code.co_name
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
-        cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user_id))
+        cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user.id))
         connection.commit()
         connection.close()
         await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
@@ -96,16 +95,15 @@ async def q2(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info("Q2 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
     if(len(question) < 200):
-        user_id = update.effective_user.id
         function_name = sys._getframe().f_code.co_name
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
-        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user_id))
+        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user.id))
         prev_q = cursor.fetchall()
         if(prev_q == [(None,)] or prev_q == []):
             await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
         else:
-            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user_id))
+            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user.id))
             connection.commit()
             connection.close()
             await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
@@ -118,16 +116,15 @@ async def q3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info("Q3 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
     if(len(question) < 200):
-        user_id = update.effective_user.id
         function_name = sys._getframe().f_code.co_name
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
-        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user_id))
+        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user.id))
         prev_q = cursor.fetchall()
         if(prev_q == [(None,)] or prev_q == []):
             await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
         else:
-            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user_id))
+            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user.id))
             connection.commit()
             connection.close()
             await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
@@ -140,16 +137,15 @@ async def q4(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info("Q4 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
     if(len(question) < 200):
-        user_id = update.effective_user.id
         function_name = sys._getframe().f_code.co_name
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
-        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user_id))
+        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user.id))
         prev_q = cursor.fetchall()
         if(prev_q == [(None,)] or prev_q == []):
             await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
         else:
-            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user_id))
+            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user.id))
             connection.commit()
             connection.close()
             await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
@@ -162,16 +158,15 @@ async def q5(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info("Q5 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
     if(len(question) < 200):
-        user_id = update.effective_user.id
         function_name = sys._getframe().f_code.co_name
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
-        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user_id))
+        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user.id))
         prev_q = cursor.fetchall()
         if(prev_q == [(None,)] or prev_q == []):
             await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
         else:
-            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user_id))
+            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user.id))
             connection.commit()
             connection.close()
             await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
@@ -184,16 +179,15 @@ async def q6(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info("Q6 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
     if(len(question) < 200):
-        user_id = update.effective_user.id
         function_name = sys._getframe().f_code.co_name
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
-        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user_id))
+        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user.id))
         prev_q = cursor.fetchall()
         if(prev_q == [(None,)] or prev_q == []):
             await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
         else:
-            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user_id))
+            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user.id))
             connection.commit()
             connection.close()
             await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
@@ -206,16 +200,15 @@ async def q7(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info("Q7 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
     if(len(question) < 200):
-        user_id = update.effective_user.id
         function_name = sys._getframe().f_code.co_name
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
-        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user_id))
+        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user.id))
         prev_q = cursor.fetchall()
         if(prev_q == [(None,)] or prev_q == []):
             await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
         else:
-            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user_id))
+            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user.id))
             connection.commit()
             connection.close()
             await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
@@ -228,16 +221,15 @@ async def q8(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info("Q8 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
     if(len(question) < 200):
-        user_id = update.effective_user.id
         function_name = sys._getframe().f_code.co_name
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
-        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user_id))
+        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user.id))
         prev_q = cursor.fetchall()
         if(prev_q == [(None,)] or prev_q == []):
             await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
         else:
-            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user_id))
+            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user.id))
             connection.commit()
             connection.close()
             await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
@@ -250,16 +242,15 @@ async def q9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info("Q9 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
     if(len(question) < 200):
-        user_id = update.effective_user.id
         function_name = sys._getframe().f_code.co_name
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
-        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user_id))
+        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user.id))
         prev_q = cursor.fetchall()
         if(prev_q == [(None,)] or prev_q == []):
             await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
         else:
-            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user_id))
+            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user.id))
             connection.commit()
             connection.close()
             await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
@@ -272,16 +263,15 @@ async def q10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info("Q10 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
     if(len(question) < 200):
-        user_id = update.effective_user.id
         function_name = sys._getframe().f_code.co_name
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
-        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user_id))
+        cursor.execute("SELECT q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user.id))
         prev_q = cursor.fetchall()
         if(prev_q == [(None,)] or prev_q == []):
             await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
         else:
-            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user_id))
+            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user.id))
             connection.commit()
             connection.close()
             await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
@@ -293,10 +283,9 @@ async def show_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info("SHOW_Q - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
     
-    user_id = update.effective_user.id
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
-    cursor.execute("SELECT q1,q2,q3,q4,q5,q6,q7,q8,q9,q10 FROM Main WHERE UserId = {0} LIMIT 1".format(user_id))
+    cursor.execute("SELECT q1,q2,q3,q4,q5,q6,q7,q8,q9,q10 FROM Main WHERE UserId = {0} LIMIT 1".format(user.id))
     data = cursor.fetchall()[0]
     connection.close()
 
@@ -315,6 +304,7 @@ async def delete_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
+    
     cursor.execute("UPDATE Main SET q1 = null, q2 = null, q3 = null, q4 = null, q5 = null, q6 = null, q7 = null, q8 = null, q9 = null, q10 = null WHERE UserId = '{0}'".format(user.id))
     connection.commit()
     connection.close()
@@ -324,12 +314,10 @@ async def delete_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def bulk_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None: # Not working because there is no \n in input
     logger.info(context.args)
     user = update.effective_user
-    questions_user = update.effective_message.text.removeprefix("/q_bulk")
-    #questions_user = ' '.join(context.args[:]).replace('"', '').replace("'", "").replace(";", "").replace("(", "").replace(")", "") # TODO: Prevent user from messing with the input
+    questions_user = update.effective_message.text.removeprefix("/q_bulk").replace('"', '').replace("'", "").replace(";", "").replace("(", "").replace(")", "") # TODO: Prevent user from messing with the input
     logger.info("BULK_Q - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Questions from User: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, questions_user))
     
     await delete_q(update, context)
-
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
 
@@ -347,7 +335,6 @@ async def bulk_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None: # 
 async def send_backup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info("SEND_BACKUP - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
-    
     await update.message.reply_html("Envíe su archivo <code>.jwlibrary</code> cuando desee, siempre será tomado en cuenta el último archivo que suba")
 
 
@@ -409,7 +396,7 @@ async def show_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def delete_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info("DELETE_URL - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
-    
+
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
     cursor.execute("SELECT Url FROM Main WHERE UserId = {0} LIMIT 1".format(user.id))
@@ -496,15 +483,25 @@ async def delete_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     connection.close()
 
 
+async def select_color(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    logger.info("SELECT_COLOR - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
+    
+    keyboard = []
+    for i, button in colors:
+        keyboard.append([InlineKeyboardButton(button, callback_data=i)])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text('Elija fecha:', reply_markup=reply_markup)
+
 async def compute(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info("COMPUTE - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
 
     await update.message.reply_text("Inicializando. Por favor, espere")
-    user_id = update.effective_user.id
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
-    cursor.execute("SELECT * FROM Main WHERE UserId = {0} LIMIT 1".format(user_id))
+    cursor.execute("SELECT * FROM Main WHERE UserId = {0} LIMIT 1".format(user.id))
     data = cursor.fetchall()[0]
     connection.close()
 
@@ -538,8 +535,10 @@ async def compute(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             dates_catalog = cursor.fetchall()
 
             list_of_dates = [datetime.strptime(x[1],"%Y-%m-%d") for x in dates_catalog] 
-   
-            newest_date = max(list_of_dates).strftime("%Y-%m-%d")
+            date_count = Counter(list_of_dates)
+            selected_dates = [date for date in list_of_dates if date_count[date] > 100] # There are some PublicationIds with the Start date wrong, so only select the ones that appear more than 100 times
+            
+            newest_date = max(selected_dates).strftime("%Y-%m-%d")
             delta_start_week_found = dates.index(newest_date)
             possiblePubId = [str(x[3]) for x in dates_catalog if x[1] == newest_date]
 
@@ -563,8 +562,8 @@ async def compute(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
         if url or str(date):
             await update.message.reply_text("Comenzando peticiones a ChatGPT. Podría tardar incluso más de 10 minutos dependiendo del número de preguntas que haya configurado y su velocidad de respuesta")
-            filename = core_worker.main(url, user_id, qs)
-            if(os.path.isfile('userBackups/{0}.jwlibrary'.format(user_id))):
+            filename = core_worker.main(url, user.id, qs)
+            if(os.path.isfile('userBackups/{0}.jwlibrary'.format(user.id))):
                 await update.message.reply_text("Aquí tiene su fichero, impórtelo a JW Library. Recuerde hacer una <b>copia de seguridad</b> para no perder los datos, ya que no ha proporcionado su archivo .jwlibrary")
             else:
                 await update.message.reply_text("Aquí tiene su fichero, impórtelo a JW Library. Al haber proporcionado su copia de seguridad, puede estar seguro de que no perderá datos aun si se corrompiera su app, ya que dispone de cómo restaurarla")
@@ -593,9 +592,11 @@ def main() -> None:
     application.add_handler(CommandHandler("url_show", show_url))
     application.add_handler(CommandHandler("url_delete", delete_url))
     application.add_handler(CommandHandler("date_select", select_date))
-    application.add_handler(CallbackQueryHandler(select_date_button))
+    application.add_handler(CallbackQueryHandler(select_date_button)) #pattern="select_date"
     application.add_handler(CommandHandler("date_show", show_date))
     application.add_handler(CommandHandler("date_delete", delete_date))
+    # application.add_handler(CommandHandler("color_select", select_color)) # TODO
+    # application.add_handler(CallbackQueryHandler(select_color_button, pattern="select_color"))
     # TODO: Hacer filter para URL pillar todo
     application.add_handler(CommandHandler("compute", compute))
 

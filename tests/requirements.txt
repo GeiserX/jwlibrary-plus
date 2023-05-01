@@ -1,0 +1,7 @@
+pyrogram==2.0.104
+#telethon==1.28.5
+#tgcrypto==1.2.5
+#uvloop==0.17.0
+#pytest==7.3.1
+python-decouple==3.8
+tgintegration==1.2.0
