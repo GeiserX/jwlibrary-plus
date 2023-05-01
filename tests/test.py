@@ -4,15 +4,22 @@ from pathlib import Path
 from decouple import config
 from pyrogram import Client
 
+import time
+import os
+
+from dotenv import load_dotenv
+
 from tgintegration import BotController
 from tgintegration import Response
 
 SESSION_NAME: str = "jwlibrary_plus_testing"
+load_dotenv() # .env File
 
 def create_client(session_name: str = SESSION_NAME) -> Client:
     return Client(
-        session_name=session_name,
-
+        name=session_name,
+        api_id = os.getenv("API_ID") ,
+        api_hash = os.getenv("API_HASH") 
     )
 
 
@@ -26,54 +33,84 @@ async def run_test(client: Client):
         global_action_delay=2.5,  # Choosing a rather high delay so we can follow along in realtime (optional)
     )
 
-    print("Clearing chat to start with a blank screen...")
+    print("Clearing chat to start with a blank screen")
     await controller.clear_chat()
 
-    print("Sending /start and waiting for exactly 3 messages...")
-    async with controller.collect(count=1) as response:  # type: Response
+    #Initialize DB - TODO
+
+    print("Sending /start")
+    async with controller.collect(count=1) as response:
         await controller.send_command("start")
-
-    # assert response.num_messages == 1
-    # print("Three messages received, bundled as a `Response`.")
     assert "https://github.com/GeiserX/jwlibrary-plus" in response.messages[0].text
-    print("First message contains the link to the bot's source code.")
+    print("First message contains the link to the bot's source code")
 
-
-
-    # print("Let's examine the buttons in the response...")
+    # print("Sending /date_select")
+    # async with controller.collect(count=1) as response:
+    #     await controller.send_command("date_select")
     # inline_keyboard = response.inline_keyboards[0]
-    # assert len(inline_keyboard.rows[0]) == 3
-    # print("Yep, there are three buttons in the first row.")
+    # assert len(inline_keyboard.rows) == 4
+    # print("Dates shown")
 
-    # # We can also press the inline keyboard buttons, in this case based on a pattern:
-    # print("Clicking the button matching the regex r'.*Examples'")
-    # examples = await inline_keyboard.click(pattern=r".*Examples")
+    # print("Clicking the first option")
+    # async with controller.collect(count=1) as response:
+    #     await inline_keyboard.click(index=0)
+    # assert "0" in response.messages[0].text
+    # print("Selected the first option")
 
-    # assert "Examples for contributing to the BotList" in examples.full_text
-    # # As the bot edits the message, `.click()` automatically listens for "message edited"
-    # # updates and returns the new state as `Response`.
+    # print("Sending /date_show")
+    # async with controller.collect(count=1) as response:
+    #     await controller.send_command("date_show")
+    # assert "0" in response.messages[0].text
+    # print("Date shown")
 
-    # print("So what happens when we send an invalid query or the peer fails to respond?")
-    # from tgintegration import InvalidResponseError
+    # print("Sending /date_delete")
+    # async with controller.collect(count=1) as response:
+    #     await controller.send_command("date_delete")
+    # assert "eliminada" in response.messages[0].text
+    # print("Date deleted")
 
-    # try:
-    #     # The following instruction will raise an `InvalidResponseError` after
-    #     # `controller.max_wait` seconds. This is because we passed `raise_no_response=True`
-    #     # during controller initialization.
-    #     print("Expecting unhandled command to raise InvalidResponseError...")
-    #     async with controller.collect():
-    #         await controller.send_command("ayylmao")
-    # except InvalidResponseError:
-    #     print("Ok, raised as expected.")
+    # async with controller.collect(count=1) as response: 
+    #     await controller.send_command("date_select")
+    # inline_keyboard = response.inline_keyboards[0]
+    # await inline_keyboard.click(index=0)
+    
+    # print("Sending /url_select")
+    # async with controller.collect(count=2) as response:
+    #     await controller.send_command("url_select", args=["https://www.jw.org/es/biblioteca/revistas/atalaya-estudio-julio-2023/Seamos-razonables-como-Jehov%C3%A1/"])
+    # assert "32" in response.messages[1].text
+    # print("Url selected")   
 
-    # # If `raise_` is explicitly set to False, no exception is raised
-    # async with controller.collect(raise_=False) as response:  # type: Response
-    #     print("Sending a message but expecting no reply...")
-    #     await client.send_message(controller.peer_id, "Henlo Fren")
+    # print("Sending /url_show")
+    # async with controller.collect(count=1) as response:
+    #     await controller.send_command("url_show")
+    # assert "jw.org" in response.messages[0].text
+    # print("Url selected")
 
-    # # In this case, tgintegration will simply emit a warning, but you can still assert
-    # # that no response has been received by using the `is_empty` property.
-    # assert response.is_empty
+    # print("Sending /url_delete")
+    # async with controller.collect(count=1) as response:
+    #     await controller.send_command("url_delete")
+    # assert "eliminada" in response.messages[0].text
+    # print("URL deleted")
+
+    # print("Upload document")
+    # async with controller.collect(count=1) as response:
+    #     await controller.send_document(str(Path(__file__).parent.resolve()) + os.sep + "test.jwlibrary")
+    # assert "correctamente" in response.messages[0].text
+    # print("Document uploaded")
+
+    # print("Describe document")
+    # async with controller.collect(count=1) as response:
+    #     await controller.send_command("backup_describe")
+    # assert "15" in response.messages[0].text
+    # print("Document described")
+
+    # print("Delete document")
+    # async with controller.collect(count=1) as response:
+    #     await controller.send_command("backup_delete")
+    # assert "eliminado" in response.messages[0].text
+    # print("Document described")
+
+
 
     print("Success!")
 

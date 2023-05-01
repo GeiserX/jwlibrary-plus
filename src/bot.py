@@ -456,7 +456,7 @@ async def show_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
-    cursor.execute("SELECT WeekDelta FROM Main WHERE UserId = {0} LIMIT 1".format(user.id))
+    cursor.execute("SELECT WeekDelta FROM Main WHERE UserId = {0}".format(user.id))
     date = cursor.fetchall()[0][0]
     connection.close()
 
@@ -472,9 +472,9 @@ async def delete_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
-    cursor.execute("SELECT WeekDelta FROM Main WHERE UserId = {0} LIMIT 1".format(user.id))
+    cursor.execute("SELECT WeekDelta FROM Main WHERE UserId = {0}".format(user.id))
     date = cursor.fetchall()[0][0]
-    if date:
+    if str(date):
         cursor.execute("UPDATE Main SET WeekDelta = null WHERE UserId = '{0}'".format(user.id))
         await update.message.reply_text("Semana eliminada")
     else:

@@ -3,6 +3,8 @@ dbs/main.db
 local_dev
 local_dev/*
 tests/jwlibrary_plus_testing.session
+tests/script.bat
+tests/.env
 
 # Byte-compiled / optimized / DLL files for Python
 src/__pycache__/
