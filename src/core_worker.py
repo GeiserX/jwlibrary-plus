@@ -228,9 +228,8 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
             cursor.execute("""INSERT INTO UserMark ('UserMarkId', 'ColorIndex', 'LocationId', 'StyleIndex', 'UserMarkGuid', 'Version')
             VALUES ('{0}', '2', '{1}', '0', '{2}', '1');""".format(userMarkId, locationId, uuid_value))
             
-
             cursor.execute ("""INSERT INTO "BlockRange" ("BlockRangeId", "BlockType", "Identifier", "StartToken", "EndToken", "UserMarkId")
-            VALUES ('{0}', '1', '{1}', '0', '100', '{2}');""".format(blockRangeId, questions[i].get("data-pid"), userMarkId))
+            VALUES ('{0}', '1', '{1}', '0', '{2}', '{3}');""".format(blockRangeId, questions[i].get("data-pid"), questions[i].text.find(".")-1, userMarkId))
             
 
             cursor.execute("""INSERT INTO Note ("NoteId", "Guid", "UserMarkId", "LocationId", "Title", "Content", "LastModified", "BlockType", "BlockIdentifier") 
@@ -286,7 +285,7 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
             VALUES ('{0}', '2', '1', '0', '{1}', '1');""".format(i+1,uuid_value))
 
             cursor.execute ("""INSERT INTO "BlockRange" ("BlockRangeId", "BlockType", "Identifier", "StartToken", "EndToken", "UserMarkId")
-            VALUES ('{0}', '1', '{1}', '0', '100', '{2}');""".format(i+1, questions[i].get("data-pid"), i+1))
+            VALUES ('{0}', '1', '{1}', '0', '{2}', '{3}');""".format(i+1, questions[i].get("data-pid"), questions[i].text.find(".")-1, i+1))
 
             cursor.execute("""INSERT INTO Note ("NoteId", "Guid", "UserMarkId", "LocationId", "Title", "Content", "LastModified", "BlockType", "BlockIdentifier") 
             VALUES ('{0}', '{1}', '{2}', '1', '{3}', '{4}', '{5}', '1', '{6}');""".format(i+1, uuid_value2, i+1, questions[i].text, notes[i].replace("'", '"'), now_iso, questions[i].get("data-pid")))

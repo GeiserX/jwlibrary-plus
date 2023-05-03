@@ -35,7 +35,7 @@ Este bot le ayudará a prepararse las reuniones usando técnicas avanzadas de In
   1. Introduzca la  fecha de la Atalaya que quiera preparar con el comando /date_select. Como alternativa, también existe la opción de proporcionar una URL de la propia Atalaya mediante /url_select [URL]
   2. Introduzca las preguntas que quiera hacer. Defina las preguntas y se aplicarán a <b>todos</b> los párrafos, con un máximo de 10. Por defecto, hay 3 preguntas incluidas. Se usa con /q1 [PREGUNTA_1], /q2 [PREGUNTA_2].... Para consultar las preguntas configuradas, usa /q_show
   3. Si no quiere perder datos, envíe su archivo de copia de seguridad de su aplicación de JW Library en formato <code>.jwlibrary</code> usando /backup_send y acto seguido enviando el archivo. Recomendamos que el artículo que quiera prepararse esté vacío para evitar problemas de posible corrupción de datos.
-  4. Una vez haya elegido sus parámetros, ejecute /compute y espere unos minutos a que se genere el archivo <code>.jwlibrary</code>
+  4. Una vez haya elegido sus parámetros, ejecute /w_prepare y espere unos minutos a que se genere el archivo <code>.jwlibrary</code>
   5. Descárguelo y restaure esta copia en su app JW Library.
 
 <u>Repositorio oficial:</u> https://github.com/GeiserX/jwlibrary-plus
@@ -443,6 +443,7 @@ async def select_date_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.answer()
 
     await query.edit_message_text(text=f"Opción seleccionada: {query.data}")
+
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
     cursor.execute("UPDATE Main SET WeekDelta = {0} WHERE UserId = {1} LIMIT 1".format(query.data, user.id)) 
@@ -487,14 +488,22 @@ async def select_color(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     user = update.effective_user
     logger.info("SELECT_COLOR - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
     
+    colors = ["Sin Color", "Amarillo", "Verde", "Azul", "Rosa", "Naranja", "Violeta"]
+
     keyboard = []
-    for i, button in colors:
+    for i, button in enumerate(colors):
         keyboard.append([InlineKeyboardButton(button, callback_data=i)])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text('Elija fecha:', reply_markup=reply_markup)
 
-async def compute(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def select_color_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(text=f"Selected option: {query.data}")
+    # TODO
+
+async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info("COMPUTE - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
 
@@ -595,10 +604,20 @@ def main() -> None:
     application.add_handler(CallbackQueryHandler(select_date_button)) #pattern="select_date"
     application.add_handler(CommandHandler("date_show", show_date))
     application.add_handler(CommandHandler("date_delete", delete_date))
-    # application.add_handler(CommandHandler("color_select", select_color)) # TODO
-    # application.add_handler(CallbackQueryHandler(select_color_button, pattern="select_color"))
+    application.add_handler(CommandHandler("color_select", select_color)) # TODO
+    application.add_handler(CallbackQueryHandler(select_color_button))
     # TODO: Hacer filter para URL pillar todo
-    application.add_handler(CommandHandler("compute", compute))
+    application.add_handler(CommandHandler("w_prepare", w_prepare))
+
+#     conv_handler = ConversationHandler(
+#     entry_points=[CommandHandler('start', start)],
+#     states={
+#         FIRST: [CallbackQueryHandler(first)],
+#         SECOND: [CallbackQueryHandler(second)]
+#     },
+#     fallbacks=[CommandHandler('start', start)]
+# )
+
 
     application.add_handler(CommandHandler("q1", q1))
     application.add_handler(CommandHandler("q2", q2))

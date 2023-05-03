@@ -140,7 +140,7 @@ async def run_test(client: Client):
 
     print("Compute with file")
     async with controller.collect(count=7, max_wait=600) as response:
-        await controller.send_command("compute")
+        await controller.send_command("w_prepare")
     assert "Inicializando" in response.messages[0].text
     assert "/date_delete" in response.messages[1].text
     assert "Testeando" in response.messages[2].text
