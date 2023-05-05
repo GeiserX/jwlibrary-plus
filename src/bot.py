@@ -34,13 +34,16 @@ Este bot le ayudará a prepararse las reuniones usando técnicas avanzadas de In
 <u>El funcionamiento es el siguiente</u>:
   1. Introduzca la  fecha de la Atalaya que quiera preparar con el comando /date_select. Como alternativa, también existe la opción de proporcionar una URL de la propia Atalaya mediante /url_select [URL]
   2. Introduzca las preguntas que quiera hacer. Defina las preguntas y se aplicarán a <b>todos</b> los párrafos, con un máximo de 10. Por defecto, hay 3 preguntas incluidas. Se usa con /q1 [PREGUNTA_1], /q2 [PREGUNTA_2].... Para consultar las preguntas configuradas, usa /q_show
-  3. Si no quiere perder datos, envíe su archivo de copia de seguridad de su aplicación de JW Library en formato <code>.jwlibrary</code> usando /backup_send y acto seguido enviando el archivo. Recomendamos que el artículo que quiera prepararse esté vacío para evitar problemas de posible corrupción de datos.
+  3. <b>Si no quiere perder datos</b>, envíe su archivo de copia de seguridad desde su aplicación de JW Library en formato <code>.jwlibrary</code> usando /backup_send y acto seguido enviando el archivo. Recomendamos que el artículo que quiera prepararse esté vacío para evitar problemas de posible corrupción de datos.
   4. Una vez haya elegido sus parámetros, ejecute /w_prepare y espere unos minutos a que se genere el archivo <code>.jwlibrary</code>
   5. Descárguelo y restaure esta copia en su app JW Library.
 
-<u>Repositorio oficial:</u> https://github.com/GeiserX/jwlibrary-plus
-<u>Descargo de Responsabilidad:</u> El software aquí presente se ofrece tal cual, sin ninguna garantía.
-<u>Nota Importante:</u> Cada vez que ejecute /start , sus preguntas guardadas se <b>borrarán</b> y comenzará con las que el software ofrece por defecto.""")
+<u>Repositorio oficial:</u>
+https://github.com/GeiserX/jwlibrary-plus
+<u>Descargo de Responsabilidad:</u>
+El software aquí presente se ofrece tal cual, sin ninguna garantía.
+<u>Nota Importante:</u>
+Cada vez que ejecute /start , sus preguntas guardadas se <b>borrarán</b> y comenzará con las que el software ofrece por defecto.""")
     
     
     connection = sqlite3.connect("dbs/main.db")
@@ -64,7 +67,7 @@ async def select_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             cursor.execute("UPDATE Main SET Url = '{0}' WHERE UserId = {1}".format(url, user.id))
             connection.commit()
             connection.close()
-            title, articleId, articleN = core_worker.extract_html(url, get_all=False)
+            title, articleId, articleN = core_worker.w_extract_html(url, get_all=False)
             articleNformatted = articleN.lower().split(" ")[-1]
             await update.message.reply_html("URL guardada.\nEn esta URL se encuentra la revista del año <b>{0}</b>, número <b>{1}</b>, artículo de estudio <b>{2}</b>.\nEl título de la Atalaya es <b>{3}</b>".format(articleId[:4], articleId[4:-2], articleNformatted, title))
         else:
@@ -505,26 +508,36 @@ async def select_color_button(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    logger.info("COMPUTE - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
+    logger.info("W_PREPARE - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
 
     await update.message.reply_text("Inicializando. Por favor, espere")
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
     cursor.execute("SELECT * FROM Main WHERE UserId = {0} LIMIT 1".format(user.id))
     data = cursor.fetchall()[0]
-    connection.close()
+    
 
     url = data[1]
     date = int(data[2])
-    qs = data[3:]
+    qs = data[3:-1]
+    lastRun = data[-1]
 
-    logger.info("BEGIN - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - URL: {5} - WeekDelta: {6} - Questions: {7}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, url, date, qs))
+    now = datetime.now(pytz.timezone('Europe/Madrid')) # TODO: Check if UTC better
+    now_iso = now.isoformat("T", "seconds")
+    
+    if datetime.fromisoformat(lastRun) == str(now.date()):
+        await update.message.reply_text("Ya se ha preparado la reunión hoy. Por favor, vuelva a intentarlo mañana. El servicio tiene un coste. Si cree que hay un error, contacte con @geiserdrums")
+        return
+    else:
+        cursor.execute("UPDATE Main SET LastRun = {0} WHERE UserId = '{1}'".format(now_iso, user.id))
+    connection.close()
+
+    logger.info("BEGIN W_PREPARE - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - URL: {5} - WeekDelta: {6} - Questions: {7} - LastRun: {8}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, url, date, qs))
 
     if any(qs):
         if url and str(date):
             await update.message.reply_text("Tiene guardados una fecha y una URL. Se está tomando la fecha como valor predeterminado. Si quiere usar la URL, borre la fecha con /date_delete")
         if str(date):
-            now = datetime.now(pytz.timezone('Europe/Madrid')) # TODO: Check if UTC better
             start_date = now - timedelta(days=now.weekday()) + timedelta(date*7)
             dates = []
             for i in range(5):
@@ -571,13 +584,19 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
         if url or str(date):
             await update.message.reply_text("Comenzando peticiones a ChatGPT. Podría tardar incluso más de 10 minutos dependiendo del número de preguntas que haya configurado y su velocidad de respuesta")
-            filename = core_worker.main(url, user.id, qs)
+            filenamejw, filenamedoc, filenamepdf = core_worker.main(url, user.id, qs)
             if(os.path.isfile('userBackups/{0}.jwlibrary'.format(user.id))):
                 await update.message.reply_text("Aquí tiene su fichero, impórtelo a JW Library. Recuerde hacer una <b>copia de seguridad</b> para no perder los datos, ya que no ha proporcionado su archivo .jwlibrary")
             else:
                 await update.message.reply_text("Aquí tiene su fichero, impórtelo a JW Library. Al haber proporcionado su copia de seguridad, puede estar seguro de que no perderá datos aun si se corrompiera su app, ya que dispone de cómo restaurarla")
-            await update.message.reply_document(document=open(filename, "rb"))
-            os.remove(filename)
+            await update.message.reply_document(document=open(filenamejw, "rb"))
+            os.remove(filenamejw)
+
+            await update.message.reply_text("Aquí también encontrará los archivos en formato Word y PDF si los necesita")
+            await update.message.reply_document(document=open(filenamedoc, "rb"))
+            await update.message.reply_document(document=open(filenamepdf, "rb"))
+            os.remove(filenamedoc)
+            os.remove(filenamepdf)
 
         else:
             await update.message.reply_text("No ha seleccionado ninguna fecha o URL")
@@ -604,20 +623,9 @@ def main() -> None:
     application.add_handler(CallbackQueryHandler(select_date_button)) #pattern="select_date"
     application.add_handler(CommandHandler("date_show", show_date))
     application.add_handler(CommandHandler("date_delete", delete_date))
-    application.add_handler(CommandHandler("color_select", select_color)) # TODO
-    application.add_handler(CallbackQueryHandler(select_color_button))
-    # TODO: Hacer filter para URL pillar todo
+    # application.add_handler(CommandHandler("color_select", select_color)) # TODO - not working
+    # application.add_handler(CallbackQueryHandler(select_color_button))
     application.add_handler(CommandHandler("w_prepare", w_prepare))
-
-#     conv_handler = ConversationHandler(
-#     entry_points=[CommandHandler('start', start)],
-#     states={
-#         FIRST: [CallbackQueryHandler(first)],
-#         SECOND: [CallbackQueryHandler(second)]
-#     },
-#     fallbacks=[CommandHandler('start', start)]
-# )
-
 
     application.add_handler(CommandHandler("q1", q1))
     application.add_handler(CommandHandler("q2", q2))

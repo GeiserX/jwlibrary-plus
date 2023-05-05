@@ -11,5 +11,6 @@ CREATE TABLE Main (
     q7          TEXT,
     q8          TEXT,
     q9          TEXT,
-    q10         TEXT
+    q10         TEXT,
+    LastRun     TEXT
 )

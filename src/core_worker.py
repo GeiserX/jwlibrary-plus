@@ -9,6 +9,11 @@ import json
 from datetime import datetime, timedelta
 import sqlite3
 from bs4 import BeautifulSoup
+from docx import Document
+from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+from docx.enum.style import WD_STYLE_TYPE
+from docx.shared import Pt
+import subprocess
 import langchain
 from langchain.chat_models import ChatOpenAI
 from langchain.cache import SQLiteCache
@@ -56,12 +61,12 @@ def describe_jwlibrary(telegram_user):
 
     return notesN, inputN, tagMaptN, tagN, bookmarkN, lastModified, userMarkN
 
-#############################
-### BEGIN EXTRACTING HTML ###
-#############################
+#######################
+### EXTRACTING HTML ###
+#######################
 
-def extract_html(url, get_all):
-    logger.info("extract_html - URL: {0} - Full Run: {1}".format(url, get_all))
+def w_extract_html(url, get_all):
+    logger.info("w_extract_html - URL: {0} - Full Run: {1}".format(url, get_all))
 
     html = requests.get(url).text
     soup = BeautifulSoup(html, features="html5lib")
@@ -90,13 +95,57 @@ def extract_html(url, get_all):
         return title, base_text, song, summary, questions, documentId, articleId, q_map
     else:
         return title, articleId, articleN
+    
+def mwb_extract_html(url, get_all): # TODO
+    logger.info("w_extract_html - URL: {0} - Full Run: {1}".format(url, get_all))
 
-##########################
-### BEGIN QUERY OPENAI ###
-##########################
+    html = requests.get(url).text
+    soup = BeautifulSoup(html, features="html5lib")
 
-def query_openai(title, base_text, song, summary, q_map, qs_user):
-    logger.info("query_openai  - Title: {0} - Base Text: {1} - Song: {2} - Summary: {3} - Questions User: {4}".format(title, base_text, song, summary, qs_user))
+    for i in soup.find_all("a"):
+        em = i.find("em")
+        if em:
+            if em.get_text() == "lff":
+                study = i.get("href")
+
+
+    study_html = requests.get("https://wol.jw.org" + study).text
+    soup_study = BeautifulSoup(study_html, features="html5lib")
+
+
+
+    # title = soup.find("h1").text
+    # classArticleId = soup.find("article", {"id" : "article"}).get("class")
+    # articleId = next(x for x in classArticleId if x.startswith("iss"))[4:] + "00"
+    # articleN = soup.find("p", {"id":"p1"}).text
+
+    # if get_all:
+    #     base_text = soup.find("p", {"id":"p3"}).text
+    #     song = soup.find("p",{"id":"p4"}).text
+    #     summary = soup.find("div", {"id": "footnote1"}).find("p").text
+    #     documentId = soup.find("input", {"name": "docid"}).get("value")
+    #     p_elements = soup.find("div", {"class":"bodyTxt"})
+    #     questions = p_elements.find_all("p", {"id": lambda x: x and x.startswith("q")})
+    #     paragraphs = p_elements.find_all("p", {"id": lambda x: x and x.startswith("p")})
+
+    #     # Example q_map = {0 : [q1, [p1]], 1 : [q2&3, [p2, p3]]}
+    #     q_map = {}
+    #     i = 0
+    #     for q in questions:
+    #         q_map[i] = [q]
+    #         q_map[i].append([p for p in paragraphs if p.has_attr('data-rel-pid') if p.get('data-rel-pid').strip('[]') in q.get('data-pid')])
+    #         i = i+1
+        
+    #     return title, base_text, song, summary, questions, documentId, articleId, q_map
+    # else:
+    #     return title, articleId, articleN
+
+####################
+### QUERY OPENAI ###
+####################
+
+def w_query_openai(title, base_text, song, summary, q_map, qs_user):
+    logger.info("w_query_openai  - Title: {0} - Base Text: {1} - Song: {2} - Summary: {3} - Questions User: {4}".format(title, base_text, song, summary, qs_user))
     langchain.llm_cache = SQLiteCache(database_path="dbs/langchain.db")
 
     questions = [f"{i}. {question}" for i, question in enumerate(qs_user, start=1) if question]
@@ -125,7 +174,7 @@ No escribas estas preguntas de nuevo en la respuesta. Separa las respuestas con 
         for p in q[1]:
             flattened_paragraph = flattened_paragraph + p.text
         notes[i] = conversation.predict(input="Pregunta: {0} -- Párrafo(s): {1}".format(q[0].text, flattened_paragraph))
-        logger.info("query_openai(Note) - Note: {0}".format(notes[i])) # TODO: Reduce logs in the future when everything works stable
+        logger.info("w_query_openai(Note) - Note: {0}".format(notes[i])) # TODO: Reduce logs in the future when everything works stable
         i=i+1
     
     return notes
@@ -308,13 +357,37 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
 
     return fileName
 
+
+def write_docx_pdf(documentId, title, questions, notes, telegram_user):
+    
+    now_date = datetime.now(pytz.timezone('Europe/Madrid')).strftime("%Y-%m-%d")
+    document = Document()
+
+    bold_style = document.styles.add_style('Bold List Number', WD_STYLE_TYPE.PARAGRAPH)
+    bold_style.font.bold = True
+
+    document.add_heading(title, 0)
+    document.add_paragraph('By JW Library Plus - https://github.com/GeiserX/jwlibrary-plus', style="Subtitle")
+
+    for i in range(len(questions)):
+        p = document.add_paragraph(style='Bold List Number')
+        p.add_run(questions[i].text).font.size = Pt(12)
+        document.add_paragraph(notes[i])
+    fileNameDoc = "userBackups/{0}/jwlibrary-plus-{1}-{2}.docx".format(telegram_user, documentId, now_date)
+    document.save(fileNameDoc)
+
+    fileNamePDF = "userBackups/{0}/jwlibrary-plus-{1}-{2}.pdf".format(telegram_user, documentId, now_date)
+    cmd_str = "abiword --to=pdf --to-name={0} {1}".format(fileNamePDF, fileNameDoc)
+    subprocess.run(cmd_str, shell=True)
+    return fileNameDoc, fileNamePDF
+
 def main(url, telegram_user, qs_user) -> None:
 
-    title, base_text, song, summary, questions, documentId, articleId, q_map = extract_html(url, get_all=True)
-    notes = query_openai(title, base_text, song, summary, q_map, qs_user)
-    filename = write_jwlibrary(documentId, articleId, title, questions, notes, telegram_user)
-    
-    return filename
+    title, base_text, song, summary, questions, documentId, articleId, q_map = w_extract_html(url, get_all=True)
+    notes = w_query_openai(title, base_text, song, summary, q_map, qs_user)
+    filenamejw = write_jwlibrary(documentId, articleId, title, questions, notes, telegram_user)
+    filenamedoc, filenamepdf = write_docx_pdf(documentId, title, questions, notes, telegram_user)
+    return filenamejw, filenamedoc, filenamepdf
 
 if __name__ == "__main__":
     main()

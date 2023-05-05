@@ -139,7 +139,7 @@ async def run_test(client: Client):
     print("Question 10 correctly not saved") 
 
     print("Compute with file")
-    async with controller.collect(count=7, max_wait=600) as response:
+    async with controller.collect(count=10, max_wait=600) as response:
         await controller.send_command("w_prepare")
     assert "Inicializando" in response.messages[0].text
     assert "/date_delete" in response.messages[1].text
@@ -148,7 +148,9 @@ async def run_test(client: Client):
     assert "ChatGPT" in response.messages[4].text
     assert "JW Library" in response.messages[5].text
     assert response.messages[6].document.file_name.endswith(".jwlibrary")
-
+    assert "PDF" in response.messages[7].text
+    assert response.messages[8].document.file_name.endswith(".docx")
+    assert response.messages[9].document.file_name.endswith(".pdf")
     print("Success!")
 
 if __name__ == "__main__":
