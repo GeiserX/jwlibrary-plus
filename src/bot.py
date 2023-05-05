@@ -525,14 +525,18 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     now = datetime.now(pytz.timezone('Europe/Madrid')) # TODO: Check if UTC better
     now_iso = now.isoformat("T", "seconds")
     
-    if datetime.fromisoformat(lastRun) == str(now.date()):
-        await update.message.reply_text("Ya se ha preparado la reunión hoy. Por favor, vuelva a intentarlo mañana. El servicio tiene un coste. Si cree que hay un error, contacte con @geiserdrums")
-        return
+    if lastRun is not None:
+        if str(datetime.fromisoformat(lastRun).date()) == str(now.date()) and (user.id not in [5978895313, 835003]): # My test accounts
+            await update.message.reply_text("Ya se ha preparado la reunión hoy. Por favor, vuelva a intentarlo mañana. El servicio tiene un coste. Si cree que hay un error, contacte con @geiserdrums")
+            return
+        else:
+            cursor.execute("UPDATE Main SET LastRun = '{0}' WHERE UserId = '{1}'".format(now_iso, user.id))
     else:
-        cursor.execute("UPDATE Main SET LastRun = {0} WHERE UserId = '{1}'".format(now_iso, user.id))
+        cursor.execute("UPDATE Main SET LastRun = '{0}' WHERE UserId = '{1}'".format(now_iso, user.id))
+    connection.commit()
     connection.close()
 
-    logger.info("BEGIN W_PREPARE - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - URL: {5} - WeekDelta: {6} - Questions: {7} - LastRun: {8}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, url, date, qs))
+    logger.info("BEGIN W_PREPARE - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - URL: {5} - WeekDelta: {6} - Questions: {7} - LastRun: {8}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, url, date, qs, lastRun))
 
     if any(qs):
         if url and str(date):
