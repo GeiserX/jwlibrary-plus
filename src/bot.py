@@ -317,7 +317,7 @@ async def delete_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def bulk_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None: # Not working because there is no \n in input
     logger.info(context.args)
     user = update.effective_user
-    questions_user = update.effective_message.text.removeprefix("/q_bulk").removeprefix("@jwlibrary_plus_dev_bot").replace('"', '').replace("'", "").replace(";", "").replace("(", "").replace(")", "") # TODO: Prevent user from messing with the input
+    questions_user = update.effective_message.text.removeprefix("/q_bulk").removeprefix("@jwlibrary_plus_dev_bot").removeprefix("@jwlibrary_plus_bot").replace('"', '').replace("'", "").replace(";", "").replace("(", "").replace(")", "") # TODO: Prevent user from messing with the input
     logger.info("BULK_Q - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Questions from User: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, questions_user))
     
     await delete_q(update, context)
@@ -506,6 +506,19 @@ async def select_color_button(update: Update, context: ContextTypes.DEFAULT_TYPE
     await query.edit_message_text(text=f"Selected option: {query.data}")
     # TODO
 
+async def admin_broadcast_msg(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    msg = update.message.text.removeprefix("/admin_broadcast_msg ").removeprefix("@jwlibrary_plus_dev_bot").removeprefix("@jwlibrary_plus_bot")
+    logger.info("ADMIN_BROADCAST_MSG - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Message: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, msg))
+    
+    if(user.id in [5978895313, 835003]): # Admin IDs
+        connection = sqlite3.connect("dbs/main.db")
+        cursor = connection.cursor()
+        cursor.execute("SELECT UserId FROM Main".format(user.id))
+        data = cursor.fetchall()
+        for user in data:
+            await context.bot.send_message(chat_id=user[0], text=msg)
+
 async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info("W_PREPARE - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
@@ -518,7 +531,7 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     
 
     url = data[1]
-    date = int(data[2])
+    date = data[2]
     qs = data[3:-1]
     lastRun = data[-1]
 
@@ -539,10 +552,10 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info("BEGIN W_PREPARE - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - URL: {5} - WeekDelta: {6} - Questions: {7} - LastRun: {8}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, url, date, qs, lastRun))
 
     if any(qs):
-        if url and str(date):
+        if (url is not None) and (date is not None):
             await update.message.reply_text("Tiene guardados una fecha y una URL. Se está tomando la fecha como valor predeterminado. Si quiere usar la URL, borre la fecha con /date_delete")
-        if str(date):
-            start_date = now - timedelta(days=now.weekday()) + timedelta(date*7)
+        if date is not None:
+            start_date = now - timedelta(days=now.weekday()) + timedelta(int(date)*7)
             dates = []
             for i in range(5):
                 dates.append((start_date - timedelta(7*i)).strftime("%Y-%m-%d"))
@@ -586,7 +599,7 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             context.args.append(url)
             await select_url(update, context)
 
-        if url or str(date):
+        if (url is not None) or (date is not None):
             await update.message.reply_text("Comenzando peticiones a ChatGPT. Podría tardar incluso más de 10 minutos dependiendo del número de preguntas que haya configurado y su velocidad de respuesta")
             filenamejw, filenamedoc, filenamepdf = core_worker.main(url, user.id, qs)
             if(os.path.isfile('userBackups/{0}.jwlibrary'.format(user.id))):
@@ -596,7 +609,7 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await update.message.reply_document(document=open(filenamejw, "rb"))
             os.remove(filenamejw)
 
-            await update.message.reply_text("Aquí también encontrará los archivos en formato Word y PDF si los necesita")
+            await update.message.reply_text("Aquí también encontrará los archivos en formato Word y PDF")
             await update.message.reply_document(document=open(filenamedoc, "rb"))
             await update.message.reply_document(document=open(filenamepdf, "rb"))
             os.remove(filenamedoc)
@@ -610,7 +623,7 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 def main() -> None:
 
-    application = Application.builder().token(os.environ["TOKEN"]).build()
+    application = Application.builder().token(os.environ["TOKEN"]).concurrent_updates(True).build()
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("url_select", select_url))
@@ -641,6 +654,8 @@ def main() -> None:
     application.add_handler(CommandHandler("q8", q8))
     application.add_handler(CommandHandler("q9", q9))
     application.add_handler(CommandHandler("q10", q10))
+
+    application.add_handler(CommandHandler("admin_broadcast_msg", admin_broadcast_msg))
 
     application.run_polling()
 

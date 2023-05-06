@@ -64,7 +64,7 @@ async def run_test(client: Client):
     assert "eliminada" in response.messages[0].text
     print("Date deleted")
 
-    async with controller.collect(count=1) as response: # Intermediate step
+    async with controller.collect(count=1, max_wait=30) as response: # Intermediate step
         await controller.send_command("date_select")
     inline_keyboard = response.inline_keyboards[0]
     await inline_keyboard.click(index=0)
@@ -135,7 +135,7 @@ async def run_test(client: Client):
     assert "Rellene" in response.messages[0].text
     print("Question 10 correctly not saved") 
 
-    print("Compute with file")
+    print("Prepare watchtower")
     async with controller.collect(count=9, max_wait=600) as response:
         await controller.send_command("w_prepare")
     assert "Inicializando" in response.messages[0].text
@@ -147,6 +147,11 @@ async def run_test(client: Client):
     assert "PDF" in response.messages[6].text
     assert response.messages[7].document.file_name.endswith(".docx")
     assert response.messages[8].document.file_name.endswith(".pdf")
+    print("File prepared")
+
+    async with controller.collect(count=1) as response:
+        await controller.send_command("admin_broadcast_msg", args=["Finished!"])
+    assert "Finished" in response.messages[0].text
     print("Success!")
 
 if __name__ == "__main__":
