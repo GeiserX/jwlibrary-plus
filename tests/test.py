@@ -36,7 +36,7 @@ async def run_test(client: Client):
     print("Sending /start")
     async with controller.collect(count=1) as response:
         await controller.send_command("start")
-    assert "https://github.com/GeiserX/jwlibrary-plus" in response.messages[0].text
+    assert "Bienvenido" in response.messages[0].text
     print("First message contains the link to the bot's source code")
 
     print("Sending /date_select")
@@ -49,13 +49,13 @@ async def run_test(client: Client):
     print("Clicking the first option")
     async with controller.collect(count=1) as response:
         await inline_keyboard.click(index=0)
-    assert "0" in response.messages[0].text
+    assert "seleccionada" in response.messages[0].text
     print("Selected the first option")
 
     print("Sending /date_show")
     async with controller.collect(count=1) as response:
         await controller.send_command("date_show")
-    assert "0" in response.messages[0].text
+    assert "configurada" in response.messages[0].text
     print("Date shown")
 
     print("Sending /date_delete")

@@ -32,16 +32,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 Este bot le ayudará a prepararse las reuniones usando técnicas avanzadas de Inteligencia Artificial, aplicadas especialmente a la relación de datos en la literatura de la organización.
 
 <u>El funcionamiento es el siguiente</u>:
+
   1. Introduzca la  fecha de la Atalaya que quiera preparar con el comando /date_select. Como alternativa, también existe la opción de proporcionar una URL de la propia Atalaya mediante /url_select [URL]
+
   2. Introduzca las preguntas que quiera hacer. Defina las preguntas y se aplicarán a <b>todos</b> los párrafos, con un máximo de 10. Por defecto, hay 3 preguntas incluidas. Se usa con /q1 [PREGUNTA_1], /q2 [PREGUNTA_2].... Para consultar las preguntas configuradas, usa /q_show
+
   3. <b>Si no quiere perder datos</b>, envíe su archivo de copia de seguridad desde su aplicación de JW Library en formato <code>.jwlibrary</code> usando /backup_send y acto seguido enviando el archivo. Recomendamos que el artículo que quiera prepararse esté vacío para evitar problemas de posible corrupción de datos.
+  
   4. Una vez haya elegido sus parámetros, ejecute /w_prepare y espere unos minutos a que se genere el archivo <code>.jwlibrary</code>
+  
   5. Descárguelo y restaure esta copia en su app JW Library.
 
-<u>Repositorio oficial:</u>
-https://github.com/GeiserX/jwlibrary-plus
 <u>Descargo de Responsabilidad:</u>
-El software aquí presente se ofrece tal cual, sin ninguna garantía.
+El software aquí presente se ofrece tal cual, sin ninguna garantía. Licencia MIT.
 <u>Nota Importante:</u>
 Cada vez que ejecute /start , sus preguntas guardadas se <b>borrarán</b> y comenzará con las que el software ofrece por defecto.""")
     
@@ -445,7 +448,16 @@ async def select_date_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     await query.answer()
 
-    await query.edit_message_text(text=f"Opción seleccionada: {query.data}")
+    if query.data == "0":
+        msg = "Semana actual"
+    elif query.data == "1":
+        msg = "Semana próxima"
+    elif query.data == "2":
+        msg = "Dentro de 2 semanas"
+    elif query.data == "3":
+        msg = "Dentro de 3 semanas" 
+
+    await query.edit_message_text(text="Opción seleccionada: {0}".format(msg))
 
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
@@ -465,7 +477,16 @@ async def show_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     connection.close()
 
     if str(date):
-        await update.message.reply_html("La semana configurada es la {0}".format(date)) # TODO: Actualmente solo responde 0, 1 ,2 o 3 dependiendo de la semana
+        if date == 0:
+            msg = "Semana actual"
+        elif date == 1:
+            msg = "Semana próxima"
+        elif date == 2:
+            msg = "Dentro de 2 semanas"
+        elif date == 3:
+            msg = "Dentro de 3 semanas" 
+
+        await update.message.reply_html("Semana configurada: {0}".format(msg))
     else:
         await update.message.reply_text("No hay semana configurada")
 
@@ -626,7 +647,6 @@ def main() -> None:
     application = Application.builder().token(os.environ["TOKEN"]).concurrent_updates(True).build()
 
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("url_select", select_url))
     application.add_handler(CommandHandler("q_show", show_q))
     application.add_handler(CommandHandler("q_delete", delete_q))
     application.add_handler(CommandHandler("q_bulk", bulk_q))
@@ -634,6 +654,7 @@ def main() -> None:
     application.add_handler(MessageHandler(filters.Document.ALL, downloader))
     application.add_handler(CommandHandler("backup_describe", describe_backup))
     application.add_handler(CommandHandler("backup_delete", delete_backup))
+    application.add_handler(CommandHandler("url_select", select_url))
     application.add_handler(CommandHandler("url_show", show_url))
     application.add_handler(CommandHandler("url_delete", delete_url))
     application.add_handler(CommandHandler("date_select", select_date))
