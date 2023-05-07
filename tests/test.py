@@ -5,7 +5,6 @@ from pyrogram import Client
 import os
 from dotenv import load_dotenv
 from tgintegration import BotController
-from tgintegration import Response
 
 SESSION_NAME: str = "jwlibrary_plus_testing"
 load_dotenv() # .env File
@@ -20,7 +19,7 @@ def create_client(session_name: str = SESSION_NAME) -> Client:
 
 async def run_test(client: Client):
     controller = BotController(
-        peer="@jwlibrary_plus_dev_bot", 
+        peer="@jwlibrary_plus_bot", # @jwlibrary_plus_bot
         client=client,
         max_wait=5,  # Maximum timeout for responses (optional)
         wait_consecutive=5,  # Minimum time to wait for more/consecutive messages (optional)
@@ -149,6 +148,19 @@ async def run_test(client: Client):
     assert response.messages[8].document.file_name.endswith(".pdf")
     print("File prepared")
 
+    print("Provoke error when sending text without commands")
+    async with controller.collect(count=1) as response:
+        await controller.send_message("a")
+    assert "bot" in response.messages[0].text
+    print("Error correctly provoked") 
+
+    print("Provoke error when sending a non-existent command")
+    async with controller.collect(count=1) as response:
+        await controller.send_command("abcde")
+    assert "comando" in response.messages[0].text
+    print("Error correctly provoked") 
+
+    print("Send a broadcast to every user that interacted with the dev bot")
     async with controller.collect(count=1) as response:
         await controller.send_command("admin_broadcast_msg", args=["Finished!"])
     assert "Finished" in response.messages[0].text

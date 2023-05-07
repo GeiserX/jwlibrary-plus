@@ -1,9 +1,9 @@
 beautifulsoup4==4.12.2
 html5lib==1.1
-langchain==0.0.158
+langchain==0.0.161
 requests==2.30.0
 openai==0.27.6
 pytz==2023.3
-python-telegram-bot==20.2
+python-telegram-bot==20.3
 validators==0.20.0
 python-docx==0.8.11
