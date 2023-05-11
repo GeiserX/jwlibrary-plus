@@ -681,7 +681,7 @@ def main() -> None:
     application.add_handler(MessageHandler(filters.Document.ALL, downloader))
     application.add_handler(CommandHandler("backup_describe", describe_backup))
     application.add_handler(CommandHandler("backup_delete", delete_backup))
-    application.add_handler(CommandHandler("url_select", select_url))
+    application.add_handler(CommandHandler("url_select", select_url, block = False))
     application.add_handler(CommandHandler("url_show", show_url))
     application.add_handler(CommandHandler("url_delete", delete_url))
     application.add_handler(CommandHandler("date_select", select_date))
@@ -691,7 +691,7 @@ def main() -> None:
     # application.add_handler(CommandHandler("color_select", select_color)) # TODO - not working
     # application.add_handler(CallbackQueryHandler(select_color_button))
     application.add_handler(CommandHandler("language_select", language_select))
-    application.add_handler(CommandHandler("w_prepare", w_prepare))
+    application.add_handler(CommandHandler("w_prepare", w_prepare, block = False))
 
     application.add_handler(CommandHandler("q1", q1))
     application.add_handler(CommandHandler("q2", q2))
