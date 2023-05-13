@@ -19,7 +19,7 @@ def create_client(session_name: str = SESSION_NAME) -> Client:
 
 async def run_test(client: Client):
     controller = BotController(
-        peer="@jwlibrary_plus_bot", # @jwlibrary_plus_bot
+        peer="@jwlibrary_plus_dev_bot", # @jwlibrary_plus_bot
         client=client,
         max_wait=5,  # Maximum timeout for responses (optional)
         wait_consecutive=5,  # Minimum time to wait for more/consecutive messages (optional)
@@ -116,11 +116,11 @@ async def run_test(client: Client):
     assert "eliminadas" in response.messages[0].text
     print("Questions deleted") 
 
-    print("Insert questions in bulk")
+    print("Insert all questions at once")
     async with controller.collect(count=2) as response:
-        await controller.send_command("q_bulk", args=["a\nNo respondas a ninguna pregunta"])
+        await controller.send_command("q_set_all", args=["a\nNo respondas a ninguna pregunta"])
     assert "guardada" in response.messages[1].text
-    print("Questions in bulk saved") 
+    print("All question(s) saved") 
 
     print("Insert question 1")
     async with controller.collect(count=1) as response:
@@ -162,8 +162,8 @@ async def run_test(client: Client):
 
     print("Send a broadcast to every user that interacted with the dev bot")
     async with controller.collect(count=1) as response:
-        await controller.send_command("admin_broadcast_msg", args=["Finished!"])
-    assert "Finished" in response.messages[0].text
+        await controller.send_command("admin_broadcast_msg", args=["Test finished!"])
+    assert "finished" in response.messages[0].text
     print("Success!")
 
 if __name__ == "__main__":

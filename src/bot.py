@@ -56,7 +56,7 @@ Cada vez que ejecute /start , sus preguntas guardadas se <b>borrarán</b> y come
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
     cursor.execute("INSERT OR IGNORE INTO Main (UserId) VALUES ('{0}')".format(user.id))
-    cursor.execute("UPDATE Main SET UserName = '{0}', FirstName = '{1}', LastName = '{2}', LangCodeTelegram = '{3}', IsBot = '{4}' WHERE UserId = '{5}'".format(user.username, user.first_name, user.last_name, user.language_code, user.is_bot, user.id)) # TODO: Delete line of code in a year or so, this was to not remove the already present db in production
+    cursor.execute("UPDATE Main SET UserName = '{0}', FirstName = '{1}', LastName = '{2}', LangCodeTelegram = '{3}', IsBot = '{4}' WHERE UserId = '{5}'".format(user.username, user.first_name, user.last_name, user.language_code, user.is_bot, user.id)) # TODO: Move to INSERT OR IGNORE (up) this line of code in a year or so, this was to not remove the already present db in production
     cursor.execute("UPDATE Main SET Q1 = '{0}', Q2 = '{1}', Q3 = '{2}', Q4 = null, Q5 = null, Q6 = null, Q7 = null, Q8 = null, Q9 = null, Q10 = null WHERE UserId = {3}".format(init_questions[0], init_questions[1], init_questions[2], user.id))
     connection.commit()
     connection.close()
@@ -322,10 +322,10 @@ async def delete_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     await update.message.reply_html("Todas las preguntas que estaban guardadas han sido eliminadas")
 
-async def bulk_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None: # Not working because there is no \n in input
+async def set_all_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None: # Not working because there is no \n in input
     logger.info(context.args)
     user = update.effective_user
-    questions_user = update.effective_message.text.removeprefix("/q_bulk").removeprefix("@jwlibrary_plus_dev_bot").removeprefix("@jwlibrary_plus_bot").replace('"', '').replace("'", "").replace(";", "").replace("(", "").replace(")", "") # TODO: Prevent user from messing with the input
+    questions_user = update.effective_message.text.removeprefix("/set_all_q").removeprefix("@jwlibrary_plus_dev_bot").removeprefix("@jwlibrary_plus_bot").replace('"', '').replace("'", "").replace(";", "").replace("(", "").replace(")", "") # TODO: Prevent user from messing with the input
     logger.info("BULK_Q - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Questions from User: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, questions_user))
     
     await delete_q(update, context)
@@ -562,7 +562,12 @@ async def language_select(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     logger.info("LANGUAGE_SELECT - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
 
     # TODO: Add language selection
-    
+    languages = ["English", "Español"]
+
+    keyboard = []
+    for i, button in enumerate(languages):
+        keyboard.append([InlineKeyboardButton(button, callback_data=i)])
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
 async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
@@ -676,7 +681,7 @@ def main() -> None:
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("q_show", show_q))
     application.add_handler(CommandHandler("q_delete", delete_q))
-    application.add_handler(CommandHandler("q_bulk", bulk_q))
+    application.add_handler(CommandHandler("q_set_all", set_all_q))
     application.add_handler(CommandHandler("backup_send", send_backup))
     application.add_handler(MessageHandler(filters.Document.ALL, downloader))
     application.add_handler(CommandHandler("backup_describe", describe_backup))
