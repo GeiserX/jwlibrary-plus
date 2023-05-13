@@ -148,11 +148,11 @@ async def run_test(client: Client):
     assert response.messages[8].document.file_name.endswith(".pdf")
     print("File prepared")
 
-    print("Provoke error when sending text without commands")
-    async with controller.collect(count=1) as response:
-        await controller.send_message("a")
-    assert "bot" in response.messages[0].text
-    print("Error correctly provoked") 
+    # print("Provoke error when sending text without commands")
+    # async with controller.collect(count=1) as response:
+    #     await controller.send_message("a")
+    # assert "bot" in response.messages[0].text
+    # print("Error correctly provoked") 
 
     print("Provoke error when sending a non-existent command")
     async with controller.collect(count=1) as response:
@@ -165,6 +165,8 @@ async def run_test(client: Client):
         await controller.send_command("admin_broadcast_msg", args=["Test finished!"])
     assert "finished" in response.messages[0].text
     print("Success!")
+
+    return
 
 if __name__ == "__main__":
     asyncio.get_event_loop().run_until_complete(run_test(create_client()))

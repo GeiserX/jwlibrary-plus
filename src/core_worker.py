@@ -16,7 +16,10 @@ from docx.shared import Pt
 import subprocess
 import langchain
 from langchain.chat_models import ChatOpenAI
-from langchain.cache import SQLiteCache
+from langchain.cache import SQLiteCache, InMemoryCache, GPTCache
+from gptcache import Cache
+from gptcache.manager.factory import manager_factory
+from gptcache.processor.pre import get_prompt
 from langchain.chains import ConversationChain
 from langchain.memory import ConversationBufferMemory
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder, SystemMessagePromptTemplate, HumanMessagePromptTemplate
@@ -24,6 +27,12 @@ from langchain.callbacks import get_openai_callback # TODO
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def init_gptcache(cache_obj: Cache, llm: str):
+    cache_obj.init(
+        pre_embedding_func=get_prompt,
+        data_manager=manager_factory(manager="sqlite,faiss,local", data_dir=f"dbs/map_cache_{llm}", vector_params={"dimension": "128"}, max_size=100000),
+    )
 
 #######################################
 ### HELPER: DESCRIBE JWLIBRARY FILE ###
@@ -146,7 +155,9 @@ def mwb_extract_html(url, get_all): # TODO
 
 def w_query_openai(title, base_text, song, summary, q_map, qs_user):
     logger.info("w_query_openai  - Title: {0} - Base Text: {1} - Song: {2} - Summary: {3} - Questions User: {4}".format(title, base_text, song, summary, qs_user))
-    langchain.llm_cache = SQLiteCache(database_path="dbs/langchain.db")
+    #langchain.llm_cache = SQLiteCache(database_path="dbs/langchain.db") # Not working
+    #langchain.llm_cache = InMemoryCache()
+    langchain.llm_cache = GPTCache(init_gptcache)
 
     questions = [f"{i}. {question}" for i, question in enumerate(qs_user, start=1) if question]
     questions_text = "\n".join(questions)

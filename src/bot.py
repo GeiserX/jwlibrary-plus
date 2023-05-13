@@ -31,26 +31,25 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text("Los bots no están permitidos")
         return
 
-    await update.message.reply_html(rf"""¡Bienvenido! 😊
+    await update.message.reply_html(rf"""😊 ¡Bienvenido! 😊
 
 Este bot le ayudará a prepararse las reuniones usando técnicas avanzadas de Inteligencia Artificial, aplicadas especialmente a la relación de datos en la literatura de la organización.
 
 <u>El funcionamiento es el siguiente</u>:
 
-  1. Introduzca la  fecha de la Atalaya que quiera preparar con el comando /date_select. Como alternativa, también existe la opción de proporcionar una URL de la propia Atalaya mediante /url_select [URL]
+  1. Introduzca la fecha de la Atalaya que quiera preparar con el comando /date_select.
 
   2. Introduzca las preguntas que quiera hacer. Defina las preguntas y se aplicarán a <b>todos</b> los párrafos, con un máximo de 10. Por defecto, hay 3 preguntas incluidas. Se usa con /Q1 [PREGUNTA_1], /q2 [PREGUNTA_2].... Para consultar las preguntas configuradas, usa /q_show
 
   3. <b>Si no quiere perder datos</b>, envíe su archivo de copia de seguridad desde su aplicación de JW Library en formato <code>.jwlibrary</code> usando /backup_send y acto seguido enviando el archivo. Recomendamos que el artículo que quiera prepararse esté vacío para evitar problemas de posible corrupción de datos.
   
-  4. Una vez haya elegido sus parámetros, ejecute /w_prepare y espere unos minutos a que se genere el archivo <code>.jwlibrary</code>
+  4. Una vez haya elegido sus preferencias, ejecute /w_prepare y espere unos minutos a que se genere el archivo <code>.jwlibrary</code>
   
-  5. Descárguelo y restaure esta copia en su app JW Library.
+  5. Descárguelo y abra este archivo en su app JW Library.
 
-<u>Descargo de Responsabilidad:</u>
-El software aquí presente se ofrece tal cual, sin ninguna garantía. Licencia MIT.
-<u>Nota Importante:</u>
-Cada vez que ejecute /start , sus preguntas guardadas se <b>borrarán</b> y comenzará con las que el software ofrece por defecto.""")
+<u>Notas Importantes:</u>
+Cada vez que ejecute /start , sus preguntas guardadas se <b>borrarán</b> y comenzará con las que el software ofrece por defecto.
+Si el bot tarda en responder, espere 15 minutos o contacte con @geiserdrums""")
     
     
     connection = sqlite3.connect("dbs/main.db")
@@ -534,7 +533,7 @@ async def select_color_button(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def admin_broadcast_msg(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    msg = update.message.text.removeprefix("/admin_broadcast_msg ").removeprefix("@jwlibrary_plus_dev_bot").removeprefix("@jwlibrary_plus_bot")
+    msg = update.message.text.removeprefix("/admin_broadcast_msg").removeprefix("@jwlibrary_plus_dev_bot").removeprefix("@jwlibrary_plus_bot")
     logger.info("ADMIN_BROADCAST_MSG - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Message: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, msg))
     
     if(user.id in [5978895313, 835003]): # Admin IDs
@@ -676,7 +675,7 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 def main() -> None:
 
-    application = Application.builder().token(os.environ["TOKEN"]).concurrent_updates(True).build()
+    application = Application.builder().token(os.environ["TOKEN"]).build()
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("q_show", show_q))
@@ -686,7 +685,7 @@ def main() -> None:
     application.add_handler(MessageHandler(filters.Document.ALL, downloader))
     application.add_handler(CommandHandler("backup_describe", describe_backup))
     application.add_handler(CommandHandler("backup_delete", delete_backup))
-    application.add_handler(CommandHandler("url_select", select_url, block = False))
+    application.add_handler(CommandHandler("url_select", select_url))
     application.add_handler(CommandHandler("url_show", show_url))
     application.add_handler(CommandHandler("url_delete", delete_url))
     application.add_handler(CommandHandler("date_select", select_date))
@@ -696,7 +695,7 @@ def main() -> None:
     # application.add_handler(CommandHandler("color_select", select_color)) # TODO - not working
     # application.add_handler(CallbackQueryHandler(select_color_button))
     application.add_handler(CommandHandler("language_select", language_select))
-    application.add_handler(CommandHandler("w_prepare", w_prepare, block = False))
+    application.add_handler(CommandHandler("w_prepare", w_prepare))
 
     application.add_handler(CommandHandler("q1", q1))
     application.add_handler(CommandHandler("q2", q2))
