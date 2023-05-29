@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 import sys
 import core_worker
 from collections import Counter
+import telegram
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters, CallbackQueryHandler
 
@@ -63,6 +64,7 @@ Si el bot tarda en responder, espere 15 minutos o contacte con @geiserdrums""")
 
 async def select_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("Testeando URL, espere por favor")
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=telegram.constants.ChatAction.TYPING)
     url = context.args[0]
     user = update.effective_user
     logger.info("URL - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - URL: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, url))
@@ -571,7 +573,8 @@ async def language_select(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info("W_PREPARE - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
-
+    await user.send_chat_action(action=telegram.constants.ChatAction.TYPING)
+    
     await update.message.reply_text("Inicializando. Por favor, espere")
     
     connection = sqlite3.connect("dbs/main.db")
