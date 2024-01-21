@@ -16,9 +16,15 @@ from collections import Counter
 import telegram
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters, CallbackQueryHandler
+from telegram.error import Forbidden
 
-logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('mylogger')
+logger.setLevel(logging.INFO) # set logger level
+logFormatter = logging.Formatter\
+("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+consoleHandler = logging.StreamHandler(sys.stdout) #set streamhandler to stdout
+consoleHandler.setFormatter(logFormatter)
+logger.addHandler(consoleHandler)
 
 init_questions=["Una ilustración o ejemplo para explicar algún punto principal del párrafo",
                 "Una experiencia en concreto, aportando referencias exactas de jw.org, que esté muy relacionada con el párrafo",

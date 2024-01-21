@@ -15,24 +15,28 @@ from docx.enum.style import WD_STYLE_TYPE
 from docx.shared import Pt
 import subprocess
 import langchain
-from langchain.chat_models import ChatOpenAI
-from langchain.cache import SQLiteCache, InMemoryCache, GPTCache
-from gptcache import Cache
-from gptcache.manager.factory import manager_factory
-from gptcache.processor.pre import get_prompt
+import langchain_community
+from langchain_openai import ChatOpenAI
+from langchain_community.callbacks import get_openai_callback
+
+#from langchain.chat_models import ChatOpenAI
+# from langchain.cache import SQLiteCache, InMemoryCache, GPTCache
+# from gptcache import Cache
+# from gptcache.manager.factory import manager_factory
+# from gptcache.processor.pre import get_prompt
 from langchain.chains import ConversationChain
 from langchain.memory import ConversationBufferMemory
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder, SystemMessagePromptTemplate, HumanMessagePromptTemplate
-from langchain.callbacks import get_openai_callback # TODO
+#from langchain.callbacks import get_openai_callback # TODO
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def init_gptcache(cache_obj: Cache, llm: str):
-    cache_obj.init(
-        pre_embedding_func=get_prompt,
-        data_manager=manager_factory(manager="sqlite,faiss,local", data_dir=f"dbs/map_cache_{llm}", vector_params={"dimension": "128"}, max_size=100000),
-    )
+# def init_gptcache(cache_obj: Cache, llm: str):
+#     cache_obj.init(
+#         pre_embedding_func=get_prompt,
+#         data_manager=manager_factory(manager="sqlite,faiss,local", data_dir=f"dbs/map_cache_{llm}", vector_params={"dimension": "128"}, max_size=100000),
+#     )
 
 #######################################
 ### HELPER: DESCRIBE JWLIBRARY FILE ###
@@ -90,8 +94,8 @@ def w_extract_html(url, get_all):
         summary = soup.find("div", {"id": "footnote1"}).find("p").text
         documentId = soup.find("input", {"name": "docid"}).get("value")
         p_elements = soup.find("div", {"class":"bodyTxt"})
-        questions = p_elements.find_all("p", {"id": lambda x: x and x.startswith("q")})
-        paragraphs = p_elements.find_all("p", {"id": lambda x: x and x.startswith("p")})
+        questions = p_elements.find_all("p", {"class": lambda x: x and x.startswith("qu")})
+        paragraphs = p_elements.find_all("p", {"class": lambda x: x and x.startswith("p")})
 
         # Example q_map = {0 : [q1, [p1]], 1 : [q2&3, [p2, p3]]}
         q_map = {}
@@ -157,12 +161,13 @@ def w_query_openai(title, base_text, song, summary, q_map, qs_user):
     logger.info("w_query_openai  - Title: {0} - Base Text: {1} - Song: {2} - Summary: {3} - Questions User: {4}".format(title, base_text, song, summary, qs_user))
     #langchain.llm_cache = SQLiteCache(database_path="dbs/langchain.db") # Not working
     #langchain.llm_cache = InMemoryCache()
-    langchain.llm_cache = GPTCache(init_gptcache)
+    # langchain.llm_cache = GPTCache(init_gptcache)
 
     questions = [f"{i}. {question}" for i, question in enumerate(qs_user, start=1) if question]
     questions_text = "\n".join(questions)
+    logger.info("w_query_openai  - Title: {0} - Base Text: {1} - Song: {2} - Summary: {3} - Questions User: {4}".format(title, base_text, song, summary, qs_user))
 
-    llm = ChatOpenAI(model_name="gpt-3.5-turbo")
+    llm = ChatOpenAI(model_name="gpt-3.5-turbo-1106")
     prompt = ChatPromptTemplate.from_messages([ # Make questions modifiable by user input
         SystemMessagePromptTemplate.from_template("""
 Eres un asistente que únicamente usa jw.org y las publicaciones de los Testigos de Jehová para mejorar la preparación de reuniones.
@@ -184,7 +189,11 @@ No escribas estas preguntas de nuevo en la respuesta. Separa las respuestas con 
         flattened_paragraph = ""
         for p in q[1]:
             flattened_paragraph = flattened_paragraph + p.text
+        
+        logger.debug("About to call predict() method.")
         notes[i] = conversation.predict(input="Pregunta: {0} -- Párrafo(s): {1}".format(q[0].text, flattened_paragraph))
+        logger.debug("Called predict() method, result: {0}".format(notes[i]))
+
         logger.info("w_query_openai(Note) - Note: {0}".format(notes[i])) # TODO: Reduce logs in the future when everything works stable
         i=i+1
     
@@ -388,7 +397,7 @@ def write_docx_pdf(documentId, title, questions, notes, telegram_user):
     document.save(fileNameDoc)
 
     fileNamePDF = "userBackups/{0}/jwlibrary-plus-{1}-{2}.pdf".format(telegram_user, documentId, now_date)
-    cmd_str = "abiword --to=pdf --to-name={0} {1}".format(fileNamePDF, fileNameDoc)
+    cmd_str = "xvfb-run abiword --to=pdf --to-name={0} {1}".format(fileNamePDF, fileNameDoc)
     subprocess.run(cmd_str, shell=True)
     return fileNameDoc, fileNamePDF
 
