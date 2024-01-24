@@ -17,7 +17,7 @@ import subprocess
 import langchain
 import langchain_community
 from langchain_openai import ChatOpenAI
-from langchain_community.callbacks import get_openai_callback
+#from langchain_community.callbacks import get_openai_callback
 
 #from langchain.chat_models import ChatOpenAI
 # from langchain.cache import SQLiteCache, InMemoryCache, GPTCache
