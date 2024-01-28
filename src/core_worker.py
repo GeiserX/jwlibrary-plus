@@ -297,12 +297,12 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
             cursor.execute("""INSERT INTO UserMark ('UserMarkId', 'ColorIndex', 'LocationId', 'StyleIndex', 'UserMarkGuid', 'Version')
             VALUES ('{0}', '2', '{1}', '0', '{2}', '1');""".format(userMarkId, locationId, uuid_value))
             
-            cursor.execute ("""INSERT INTO "BlockRange" ("BlockRangeId", "BlockType", "Identifier", "StartToken", "EndToken", "UserMarkId")
+            cursor.execute("""INSERT INTO "BlockRange" ("BlockRangeId", "BlockType", "Identifier", "StartToken", "EndToken", "UserMarkId")
             VALUES ('{0}', '1', '{1}', '0', '{2}', '{3}');""".format(blockRangeId, questions[i].get("data-pid"), questions[i].text.find(".")-1, userMarkId))
             
 
-            cursor.execute("""INSERT INTO Note ("NoteId", "Guid", "UserMarkId", "LocationId", "Title", "Content", "LastModified", "BlockType", "BlockIdentifier") 
-            VALUES ('{0}', '{1}', '{2}', '{3}', '{4}', '{5}', '{6}', '1', '{7}');""".format(noteId, uuid_value2, userMarkId, locationId, questions[i].text, notes[i].replace("'", '"'), now_iso, questions[i].get("data-pid")))
+            cursor.execute("""INSERT INTO Note ("NoteId", "Guid", "UserMarkId", "LocationId", "Title", "Content", "LastModified", "Created", "BlockType", "BlockIdentifier") 
+            VALUES ('{0}', '{1}', '{2}', '{3}', '{4}', '{5}', '{6}', '{7}', '1', '{8}');""".format(noteId, uuid_value2, userMarkId, locationId, questions[i].text, notes[i].replace("'", '"'), now_iso, now_iso, questions[i].get("data-pid")))
 
             cursor.execute("INSERT INTO TagMap ('TagMapId', 'NoteId', 'TagId', 'Position') VALUES ('{0}', '{1}', '{2}', '{3}')".format(tagMapId, noteId, tagId, Position))
             userMarkId += 1
@@ -356,8 +356,8 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
             cursor.execute ("""INSERT INTO "BlockRange" ("BlockRangeId", "BlockType", "Identifier", "StartToken", "EndToken", "UserMarkId")
             VALUES ('{0}', '1', '{1}', '0', '{2}', '{3}');""".format(i+1, questions[i].get("data-pid"), questions[i].text.find(".")-1, i+1))
 
-            cursor.execute("""INSERT INTO Note ("NoteId", "Guid", "UserMarkId", "LocationId", "Title", "Content", "LastModified", "BlockType", "BlockIdentifier") 
-            VALUES ('{0}', '{1}', '{2}', '1', '{3}', '{4}', '{5}', '1', '{6}');""".format(i+1, uuid_value2, i+1, questions[i].text, notes[i].replace("'", '"'), now_iso, questions[i].get("data-pid")))
+            cursor.execute("""INSERT INTO Note ("NoteId", "Guid", "UserMarkId", "LocationId", "Title", "Content", "LastModified", "Created", "BlockType", "BlockIdentifier") 
+            VALUES ('{0}', '{1}', '{2}', '1', '{3}', '{4}', '{5}', '{6}', '1', '{7}');""".format(i+1, uuid_value2, i+1, questions[i].text, notes[i].replace("'", '"'), now_iso, now_iso, questions[i].get("data-pid")))
 
             cursor.execute("INSERT INTO TagMap ('TagMapId', 'NoteId', 'TagId', 'Position') VALUES ('{0}', '{1}', '2', '{2}')".format(i+1,i+1,i))
 
