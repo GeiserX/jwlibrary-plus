@@ -27,10 +27,6 @@ consoleHandler = logging.StreamHandler(sys.stdout) #set streamhandler to stdout
 consoleHandler.setFormatter(logFormatter)
 logger.addHandler(consoleHandler)
 
-init_questions=[_("Una ilustración o ejemplo para explicar algún punto principal del párrafo"),
-                _("Una experiencia en concreto, aportando referencias exactas de jw.org, que esté muy relacionada con el párrafo"),
-                _("Una explicación sobre uno de los textos que aparezcan, que aplique al párrafo. Usa la Traducción del Nuevo Mundo (edición de estudio) de la Biblia de los Testigos de Jehová")]
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info("START - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
@@ -65,7 +61,10 @@ Este bot le ayudará a prepararse las reuniones usando técnicas avanzadas de In
 Cada vez que ejecute /start , sus preguntas guardadas se <b>borrarán</b> y comenzará con las que el software ofrece por defecto.
 Si el bot tarda en responder, espere 15 minutos o contacte con @geiserdrums . El bot sirve a cada usuario individualmente, con lo que quizá lo esté usando otra persona, sea paciente"""))
     
-    
+    init_questions=[_("Una ilustración o ejemplo para explicar algún punto principal del párrafo"),
+                    _("Una experiencia en concreto, aportando referencias exactas de jw.org, que esté muy relacionada con el párrafo"),
+                    _("Una explicación sobre uno de los textos que aparezcan, que aplique al párrafo. Usa la Traducción del Nuevo Mundo (edición de estudio) de la Biblia de los Testigos de Jehová")]
+
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
     cursor.execute("INSERT OR IGNORE INTO Main (UserId) VALUES ('{0}')".format(user.id))
@@ -76,6 +75,12 @@ Si el bot tarda en responder, espere 15 minutos o contacte con @geiserdrums . El
 
 
 async def select_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
     await update.message.reply_text(_("Testeando URL, espere por favor"))
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=telegram.constants.ChatAction.TYPING)
     url = context.args[0]
@@ -98,6 +103,12 @@ async def select_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         await update.message.reply_text(_("No es un una URL válida"))
 
 async def save_question(update: Update, context: ContextTypes.DEFAULT_TYPE, question_number: int) -> None:
+    user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
     question = ' '.join(context.args[:]).replace('"', '').replace("'", "").replace(";", "").replace("(", "").replace(")", "")  # TODO: Prevent user from messing with the input
     user = update.effective_user
     logger.info("Q{0} - User ID: {1} - First Name: {2} - Last Name: {3} - Username: {4} - Language Code: {5} - Question: {6}".format(question_number, user.id, user.first_name, user.last_name, user.username, user.language_code, question))
@@ -159,6 +170,12 @@ async def q10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def show_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
+    user = update.effective_user
     logger.info("SHOW_Q - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
     
     connection = sqlite3.connect("dbs/main.db")
@@ -178,6 +195,12 @@ async def show_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def delete_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
+    user = update.effective_user
     logger.info("DELETE_Q - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
     
     connection = sqlite3.connect("dbs/main.db")
@@ -190,6 +213,12 @@ async def delete_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_html(_("Todas las preguntas que estaban guardadas han sido eliminadas"))
 
 async def set_all_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None: # Not working because there is no \n in input
+    user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
     logger.info(context.args)
     user = update.effective_user
     questions_user = update.effective_message.text.removeprefix("/set_all_q").removeprefix("@jwlibrary_plus_dev_bot").removeprefix("@jwlibrary_plus_bot").replace('"', '').replace("'", "").replace(";", "").replace("(", "").replace(")", "") # TODO: Prevent user from messing with the input
@@ -212,11 +241,23 @@ async def set_all_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def send_backup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
+    user = update.effective_user
     logger.info("SEND_BACKUP - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
     await update.message.reply_html(_("Envíe su archivo <code>.jwlibrary</code> cuando desee, siempre será tomado en cuenta el último archivo que suba"))
 
 
 async def downloader(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
     user = update.effective_user
     file = await context.bot.get_file(update.message.document)
     logger.info("SENDBACKUP - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - File ID: {5} - File Path: {6}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, file.file_id, file.file_path))
@@ -230,6 +271,12 @@ async def downloader(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 async def delete_backup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
+    user = update.effective_user
     logger.info("DELETE_BACKUP - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
     
     os.remove('/app/userBackups/{0}.jwlibrary'.format(user.id))
@@ -237,6 +284,12 @@ async def delete_backup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 async def describe_backup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
     user = update.effective_user
     logger.info("DESCRIBE_BACKUP - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
     
@@ -257,6 +310,12 @@ async def describe_backup(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def show_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
+    user = update.effective_user
     logger.info("SHOW_URL - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
@@ -272,6 +331,12 @@ async def show_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def delete_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
     user = update.effective_user
     logger.info("DELETE_URL - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
 
@@ -289,6 +354,12 @@ async def delete_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def select_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
     user = update.effective_user
     logger.info("SELECT_DATE - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
 
@@ -310,10 +381,16 @@ async def select_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         keyboard.append([InlineKeyboardButton(button, callback_data=i)])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await update.message.reply_text(_('Elija fecha:', reply_markup=reply_markup))
+    await update.message.reply_text(_('Elija fecha:'), reply_markup=reply_markup)
 
 
 async def select_date_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
     user = update.effective_user
     logger.info("SELECT_DATE_BUTTON - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
 
@@ -340,6 +417,12 @@ async def select_date_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def show_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
+    user = update.effective_user
     logger.info("SHOW_DATE - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
     
     connection = sqlite3.connect("dbs/main.db")
@@ -365,6 +448,12 @@ async def show_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def delete_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
+    user = update.effective_user
     logger.info("DELETE_DATE - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
     
     connection = sqlite3.connect("dbs/main.db")
@@ -381,6 +470,12 @@ async def delete_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 
 # async def select_color(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # user = update.effective_user
+    # domain = "jwlibraryplus"
+    # locale_dir = "../locales"
+    # target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    # translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    # _ = translation.gettext
 #     user = update.effective_user
 #     logger.info("SELECT_COLOR - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
     
@@ -401,6 +496,12 @@ async def delete_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 async def admin_broadcast_msg(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
+    user = update.effective_user
     msg = update.message.text.removeprefix("/admin_broadcast_msg").removeprefix("@jwlibrary_plus_dev_bot").removeprefix("@jwlibrary_plus_bot")
     logger.info("ADMIN_BROADCAST_MSG - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Message: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, msg))
     
@@ -414,17 +515,35 @@ async def admin_broadcast_msg(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def default_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
+    user = update.effective_user
     logger.info("DEFAULT_MESSAGE - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
 
     await update.message.reply_text(_("Este bot solo funciona a través de comandos. Por ejemplo, para introducir la pregunta 1, mande un mensaje con /q1 [PREGUNTA], sin los corchetes, e incluya su propia pregunta"))
 
 async def default_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
+    user = update.effective_user
     logger.info("DEFAULT_COMMAND - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
 
     await update.message.reply_text(_("Ha introducido un comando erróneo. Revise por favor la lista de comandos admitidos enviando el mensaje /start o haga click en el botón azul a la izquierda del cuadro de texto llamado 'Menú'"))
 
 async def language_select(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
     user = update.effective_user
     logger.info("LANGUAGE_SELECT - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
 
@@ -437,6 +556,12 @@ async def language_select(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     reply_markup = InlineKeyboardMarkup(keyboard)
 
 async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
     user = update.effective_user
     logger.info("W_PREPARE - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
     await user.send_chat_action(action=telegram.constants.ChatAction.TYPING)
