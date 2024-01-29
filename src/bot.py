@@ -429,6 +429,8 @@ async def show_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     cursor = connection.cursor()
     cursor.execute("SELECT WeekDelta FROM Main WHERE UserId = {0}".format(user.id))
     date = cursor.fetchall()[0][0]
+    if not date:
+        date=0
     connection.close()
 
     if str(date):
@@ -440,6 +442,7 @@ async def show_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             msg = _("Dentro de 2 semanas")
         elif date == 3:
             msg = _("Dentro de 3 semanas")
+        
 
         await update.message.reply_html(_("Semana configurada: <b>{0}</b>").format(msg))
     else:
