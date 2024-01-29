@@ -577,6 +577,8 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     url = cursor.fetchall()[0][0]
     cursor.execute("SELECT WeekDelta FROM Main WHERE UserId = {0} LIMIT 1".format(user.id))
     date = cursor.fetchall()[0][0]
+    if not date:
+        date=0
     cursor.execute("SELECT Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q10 FROM Main WHERE UserId = {0} LIMIT 1".format(user.id))
     qs = cursor.fetchall()[0]
     cursor.execute("SELECT LastRun FROM Main WHERE UserId = {0} LIMIT 1".format(user.id))

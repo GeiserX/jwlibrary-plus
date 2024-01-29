@@ -215,8 +215,9 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
     now_date = now.strftime("%Y-%m-%d")
     hour_minute_second = now.strftime("%H-%M-%S")
     now_iso = now.isoformat("T", "seconds")
-
-    j = '{{"name":"jwlibrary-plus-backup_{0}","creationDate":"{1}","version":1,"type":0,"userDataBackup":{{"lastModifiedDate":"{2}","deviceName":"jwlibrary-plus","databaseName":"userData.db","schemaVersion":8}}}}'.format(now_date, now_date, now_iso)
+    schema_version = 14 # TODO: Upgrade when needed
+    
+    j = '{{"name":"jwlibrary-plus-backup_{0}","creationDate":"{1}","version":1,"type":0,"userDataBackup":{{"lastModifiedDate":"{2}","deviceName":"jwlibrary-plus","databaseName":"userData.db","schemaVersion":{3}}}}}'.format(now_date, now_date, now_iso, schema_version)
     manifest = json.loads(j)
 
     if(os.path.isfile(uploadedJwLibrary)):
