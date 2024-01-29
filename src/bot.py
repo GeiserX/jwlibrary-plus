@@ -221,7 +221,7 @@ async def set_all_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     _ = translation.gettext
     logger.info(context.args)
     user = update.effective_user
-    questions_user = update.effective_message.text.removeprefix("/set_all_q").removeprefix("@jwlibrary_plus_dev_bot").removeprefix("@jwlibrary_plus_bot").replace('"', '').replace("'", "").replace(";", "").replace("(", "").replace(")", "") # TODO: Prevent user from messing with the input
+    questions_user = update.effective_message.text.removeprefix("/q_set_all").removeprefix("@jwlibrary_plus_dev_bot").removeprefix("@jwlibrary_plus_bot").replace('"', '').replace("'", "").replace(";", "").replace("(", "").replace(")", "") # TODO: Prevent user from messing with the input
     logger.info("BULK_Q - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Questions from User: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, questions_user))
     
     await delete_q(update, context)
