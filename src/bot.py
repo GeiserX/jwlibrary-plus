@@ -74,6 +74,9 @@ Si el bot tarda en responder, espere 15 minutos o contacte con @geiserdrums . El
     connection.close()
 
 
+
+
+
 async def select_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     domain = "jwlibraryplus"
@@ -587,7 +590,9 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     langSelected = cursor.fetchall()[0][0]
 
     now = datetime.now(pytz.timezone('Europe/Madrid')) # TODO: Check if UTC better
-    now_iso = now.isoformat("T", "seconds")
+    now_iso = now_utc.isoformat("T", "seconds")
+    now_utc = now.astimezone(pytz.UTC)
+    now_utc_iso = now_utc.isoformat("T", "seconds").replace('+00:00', 'Z')
     
     if lastRun is not None:
         if str(datetime.fromisoformat(lastRun).date()) == str(now.date()) and (user.id not in [5978895313, 835003]): # My test accounts
