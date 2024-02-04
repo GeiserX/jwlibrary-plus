@@ -590,7 +590,7 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     langSelected = cursor.fetchall()[0][0]
 
     now = datetime.now(pytz.timezone('Europe/Madrid')) # TODO: Check if UTC better
-    now_iso = now_utc.isoformat("T", "seconds")
+    now_iso = now.isoformat("T", "seconds")
     now_utc = now.astimezone(pytz.UTC)
     now_utc_iso = now_utc.isoformat("T", "seconds").replace('+00:00', 'Z')
     

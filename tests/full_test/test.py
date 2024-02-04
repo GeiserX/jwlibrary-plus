@@ -1,4 +1,5 @@
 import asyncio
+import time
 from pathlib import Path
 from decouple import config
 from pyrogram import Client
@@ -15,7 +16,6 @@ def create_client(session_name: str = SESSION_NAME) -> Client:
         api_id = os.getenv("API_ID") ,
         api_hash = os.getenv("API_HASH") 
     )
-
 
 async def run_test(client: Client):
     controller = BotController(
@@ -148,11 +148,11 @@ async def run_test(client: Client):
     assert response.messages[8].document.file_name.endswith(".pdf")
     print("File prepared")
 
-    # print("Provoke error when sending text without commands")
-    # async with controller.collect(count=1) as response:
-    #     await controller.send_message("a")
-    # assert "bot" in response.messages[0].text
-    # print("Error correctly provoked") 
+    print("Provoke error when sending text without commands")
+    async with controller.collect(count=1) as response:
+        await controller.send_message("a")
+    assert "bot" in response.messages[0].text
+    print("Error correctly provoked") 
 
     print("Provoke error when sending a non-existent command")
     async with controller.collect(count=1) as response:

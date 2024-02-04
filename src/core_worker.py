@@ -214,13 +214,15 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
     now = datetime.now(pytz.timezone('Europe/Madrid'))
     now_date = now.strftime("%Y-%m-%d")
     hour_minute_second = now.strftime("%H-%M-%S")
-    now_iso = now_utc.isoformat("T", "seconds")
+    now_iso = now.isoformat("T", "seconds")
     now_utc = now.astimezone(pytz.UTC)
     now_utc_iso = now_utc.isoformat("T", "seconds").replace('+00:00', 'Z')
     schema_version = 14 # TODO: Upgrade when needed
 
     j = '{{"name":"jwlibrary-plus-backup_{0}","creationDate":"{1}","version":1,"type":0,"userDataBackup":{{"lastModifiedDate":"{2}","deviceName":"jwlibrary-plus","databaseName":"userData.db","schemaVersion":{3}}}}}'.format(now_date, now_date, now_iso, schema_version)
     manifest = json.loads(j)
+
+    thumbnail_file = "extra/default_thumbnail.png"
 
     if(os.path.isfile(uploadedJwLibrary)):
         logger.info("Archivo .jwlibrary encontrado")
@@ -245,7 +247,7 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
             cursor.execute("SELECT max(LocationId) FROM Location")
             locationId = cursor.fetchall()[0][0] + 1
             cursor.execute("""INSERT INTO Location (LocationId, DocumentId, IssueTagNumber, KeySymbol, MepsLanguage, Type)
-            VALUES ({0}, {1}, {2}, "w", 1, 0, "{3}");""".format(locationId, documentId, articleId))
+            VALUES ({0}, {1}, {2}, "w", 1, 0);""".format(locationId, documentId, articleId))
         
         cursor.execute("SELECT TagId FROM Tag WHERE Name = 'jwlibrary-plus'")
         tagId = cursor.fetchall()
@@ -320,9 +322,10 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
         connection.close()
 
         fileName = "userBackups/{0}/jwlibrary-plus-{1}-{2}.jwlibrary".format(telegram_user, documentId, now_date)
-        zf = zipfile.ZipFile(fileName, "w")
-        zf.write(uploadedDb, arcname= "userData.db") # TODO
+        zf = zipfile.ZipFile(fileName, "w", compression=zipfile.ZIP_DEFLATED)
+        zf.write(uploadedDb, arcname= "userData.db")
         zf.write(manifest_file, arcname="manifest.json")
+        zf.write(thumbnail_file, arcname="default_thumbnail.png")
         zf.close()
 
         os.remove(uploadedDb) # Remove all data from the user except the newly generated .jwlibrary file, which will be deleted after being sent
@@ -344,7 +347,7 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
         cursor = connection.cursor()
 
         cursor.execute("""INSERT INTO Location (LocationId, DocumentId, IssueTagNumber, KeySymbol, MepsLanguage, Type)
-        VALUES (1, {0}, {1}, "w", 1, 0, "{2}");""".format(documentId, articleId))
+        VALUES (1, {0}, {1}, "w", 1, 0);""".format(documentId, articleId))
 
         cursor.execute("INSERT INTO Tag ('TagId', 'Type', 'Name') VALUES ('2', '1', 'jwlibrary-plus')")
 
@@ -369,9 +372,10 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
         connection.close()
 
         fileName = "userBackups/{0}/jwlibrary-plus-{1}-{2}.jwlibrary".format(telegram_user, documentId, now_date)
-        zf = zipfile.ZipFile(fileName, "w")
+        zf = zipfile.ZipFile(fileName, "w", compression=zipfile.ZIP_DEFLATED)
         zf.write(dbFromUser, arcname= "userData.db")
         zf.write(manifest_file, arcname="manifest.json")
+        zf.write(thumbnail_file, arcname="default_thumbnail.png")
         zf.close()
 
         os.remove(dbFromUser)    
