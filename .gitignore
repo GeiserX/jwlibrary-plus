@@ -3,7 +3,7 @@ dbs/main.db
 local_dev
 local_dev/*
 tests/full_test/jwlibrary_plus_testing.session
-script.bat
+script-deploy-test.bat
 tests/full_test/.env
 
 # Byte-compiled / optimized / DLL files for Python
