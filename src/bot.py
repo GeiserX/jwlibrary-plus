@@ -27,6 +27,10 @@ consoleHandler = logging.StreamHandler(sys.stdout) #set streamhandler to stdout
 consoleHandler.setFormatter(logFormatter)
 logger.addHandler(consoleHandler)
 
+init_questions=["Una ilustración o ejemplo para explicar algún punto principal del párrafo",
+                "Una experiencia en concreto, aportando referencias exactas de jw.org, que esté muy relacionada con el párrafo",
+                "Una explicación sobre uno de los textos que aparezcan, que aplique al párrafo. Usa la Biblia de Estudio de los Testigos de Jehová"]
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info("START - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))

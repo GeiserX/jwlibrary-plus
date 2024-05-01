@@ -17,8 +17,11 @@ import subprocess
 import langchain
 import langchain_community
 from langchain_openai import ChatOpenAI
+from langchain.cache import SQLiteCache
+from langchain.globals import set_llm_cache
 #from langchain_community.callbacks import get_openai_callback
-
+cache = SQLiteCache(database_path="/app/dbs/langchain.db")
+set_llm_cache(cache)
 #from langchain.chat_models import ChatOpenAI
 # from langchain.cache import SQLiteCache, InMemoryCache, GPTCache
 # from gptcache import Cache
@@ -89,9 +92,9 @@ def w_extract_html(url, get_all):
     articleN = soup.find("p", {"id":"p1"}).text
 
     if get_all:
-        base_text = soup.find("p", {"id":"p3"}).text
-        song = soup.find("p",{"id":"p4"}).text
-        summary = soup.find("div", {"id": "footnote1"}).find("p").text
+        base_text = soup.find("p", {"id":"p4"}).text
+        song = soup.find("p",{"id":"p2"}).text
+        summary = soup.find("p",{"id":"p6"}).text
         documentId = soup.find("input", {"name": "docid"}).get("value")
         p_elements = soup.find("div", {"class":"bodyTxt"})
         questions = p_elements.find_all("p", {"class": lambda x: x and x.startswith("qu")})
@@ -167,7 +170,7 @@ def w_query_openai(title, base_text, song, summary, q_map, qs_user):
     questions_text = "\n".join(questions)
     logger.info("w_query_openai  - Title: {0} - Base Text: {1} - Song: {2} - Summary: {3} - Questions User: {4}".format(title, base_text, song, summary, qs_user))
 
-    llm = ChatOpenAI(model_name="gpt-3.5-turbo-1106")
+    llm = ChatOpenAI(model_name="gpt-4-turbo")
     prompt = ChatPromptTemplate.from_messages([ # Make questions modifiable by user input
         SystemMessagePromptTemplate.from_template("""
 Eres un asistente que únicamente usa jw.org y las publicaciones de los Testigos de Jehová para mejorar la preparación de reuniones.
