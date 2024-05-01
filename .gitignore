@@ -2,9 +2,9 @@ dbs/langchain.db
 dbs/main.db
 local_dev
 local_dev/*
-tests/jwlibrary_plus_testing.session
-tests/script.bat
-tests/.env
+tests/full_test/jwlibrary_plus_testing.session
+script.bat
+tests/full_test/.env
 
 # Byte-compiled / optimized / DLL files for Python
 src/__pycache__/

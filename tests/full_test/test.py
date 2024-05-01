@@ -1,4 +1,5 @@
 import asyncio
+import time
 from pathlib import Path
 from decouple import config
 from pyrogram import Client
@@ -16,12 +17,11 @@ def create_client(session_name: str = SESSION_NAME) -> Client:
         api_hash = os.getenv("API_HASH") 
     )
 
-
 async def run_test(client: Client):
     controller = BotController(
         peer="@jwlibrary_plus_dev_bot", # @jwlibrary_plus_bot
         client=client,
-        max_wait=5,  # Maximum timeout for responses (optional)
+        max_wait=7,  # Maximum timeout for responses (optional)
         wait_consecutive=5,  # Minimum time to wait for more/consecutive messages (optional)
         raise_no_response=True,  # Raise `InvalidResponseError` when no response received (defaults to True)
         #global_action_delay=2.5,  # Choosing a rather high delay so we can follow along in realtime (optional)
@@ -124,7 +124,7 @@ async def run_test(client: Client):
 
     print("Insert question 1")
     async with controller.collect(count=1) as response:
-        await controller.send_command("q1", args=["No respondas a ninguna pregunta a partir de ahora"])
+        await controller.send_command("q1", args=["Responde en una frase corta, muy corta"])
     assert "guardada" in response.messages[0].text
     print("Question 1 saved") 
 
@@ -148,11 +148,11 @@ async def run_test(client: Client):
     assert response.messages[8].document.file_name.endswith(".pdf")
     print("File prepared")
 
-    # print("Provoke error when sending text without commands")
-    # async with controller.collect(count=1) as response:
-    #     await controller.send_message("a")
-    # assert "bot" in response.messages[0].text
-    # print("Error correctly provoked") 
+    print("Provoke error when sending text without commands")
+    async with controller.collect(count=1) as response:
+        await controller.send_message("a")
+    assert "bot" in response.messages[0].text
+    print("Error correctly provoked") 
 
     print("Provoke error when sending a non-existent command")
     async with controller.collect(count=1) as response:

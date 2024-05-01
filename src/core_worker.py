@@ -15,24 +15,28 @@ from docx.enum.style import WD_STYLE_TYPE
 from docx.shared import Pt
 import subprocess
 import langchain
-from langchain.chat_models import ChatOpenAI
-from langchain.cache import SQLiteCache, InMemoryCache, GPTCache
-from gptcache import Cache
-from gptcache.manager.factory import manager_factory
-from gptcache.processor.pre import get_prompt
+import langchain_community
+from langchain_openai import ChatOpenAI
+#from langchain_community.callbacks import get_openai_callback
+
+#from langchain.chat_models import ChatOpenAI
+# from langchain.cache import SQLiteCache, InMemoryCache, GPTCache
+# from gptcache import Cache
+# from gptcache.manager.factory import manager_factory
+# from gptcache.processor.pre import get_prompt
 from langchain.chains import ConversationChain
 from langchain.memory import ConversationBufferMemory
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder, SystemMessagePromptTemplate, HumanMessagePromptTemplate
-from langchain.callbacks import get_openai_callback # TODO
+#from langchain.callbacks import get_openai_callback # TODO
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def init_gptcache(cache_obj: Cache, llm: str):
-    cache_obj.init(
-        pre_embedding_func=get_prompt,
-        data_manager=manager_factory(manager="sqlite,faiss,local", data_dir=f"dbs/map_cache_{llm}", vector_params={"dimension": "128"}, max_size=100000),
-    )
+# def init_gptcache(cache_obj: Cache, llm: str):
+#     cache_obj.init(
+#         pre_embedding_func=get_prompt,
+#         data_manager=manager_factory(manager="sqlite,faiss,local", data_dir=f"dbs/map_cache_{llm}", vector_params={"dimension": "128"}, max_size=100000),
+#     )
 
 #######################################
 ### HELPER: DESCRIBE JWLIBRARY FILE ###
@@ -90,8 +94,8 @@ def w_extract_html(url, get_all):
         summary = soup.find("div", {"id": "footnote1"}).find("p").text
         documentId = soup.find("input", {"name": "docid"}).get("value")
         p_elements = soup.find("div", {"class":"bodyTxt"})
-        questions = p_elements.find_all("p", {"id": lambda x: x and x.startswith("q")})
-        paragraphs = p_elements.find_all("p", {"id": lambda x: x and x.startswith("p")})
+        questions = p_elements.find_all("p", {"class": lambda x: x and x.startswith("qu")})
+        paragraphs = p_elements.find_all("p", {"class": lambda x: x and x.startswith("p")})
 
         # Example q_map = {0 : [q1, [p1]], 1 : [q2&3, [p2, p3]]}
         q_map = {}
@@ -157,12 +161,13 @@ def w_query_openai(title, base_text, song, summary, q_map, qs_user):
     logger.info("w_query_openai  - Title: {0} - Base Text: {1} - Song: {2} - Summary: {3} - Questions User: {4}".format(title, base_text, song, summary, qs_user))
     #langchain.llm_cache = SQLiteCache(database_path="dbs/langchain.db") # Not working
     #langchain.llm_cache = InMemoryCache()
-    langchain.llm_cache = GPTCache(init_gptcache)
+    # langchain.llm_cache = GPTCache(init_gptcache)
 
     questions = [f"{i}. {question}" for i, question in enumerate(qs_user, start=1) if question]
     questions_text = "\n".join(questions)
+    logger.info("w_query_openai  - Title: {0} - Base Text: {1} - Song: {2} - Summary: {3} - Questions User: {4}".format(title, base_text, song, summary, qs_user))
 
-    llm = ChatOpenAI(model_name="gpt-3.5-turbo")
+    llm = ChatOpenAI(model_name="gpt-3.5-turbo-1106")
     prompt = ChatPromptTemplate.from_messages([ # Make questions modifiable by user input
         SystemMessagePromptTemplate.from_template("""
 Eres un asistente que únicamente usa jw.org y las publicaciones de los Testigos de Jehová para mejorar la preparación de reuniones.
@@ -184,7 +189,11 @@ No escribas estas preguntas de nuevo en la respuesta. Separa las respuestas con 
         flattened_paragraph = ""
         for p in q[1]:
             flattened_paragraph = flattened_paragraph + p.text
+        
+        logger.debug("About to call predict() method.")
         notes[i] = conversation.predict(input="Pregunta: {0} -- Párrafo(s): {1}".format(q[0].text, flattened_paragraph))
+        logger.debug("Called predict() method, result: {0}".format(notes[i]))
+
         logger.info("w_query_openai(Note) - Note: {0}".format(notes[i])) # TODO: Reduce logs in the future when everything works stable
         i=i+1
     
@@ -206,9 +215,14 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
     now_date = now.strftime("%Y-%m-%d")
     hour_minute_second = now.strftime("%H-%M-%S")
     now_iso = now.isoformat("T", "seconds")
+    now_utc = now.astimezone(pytz.UTC)
+    now_utc_iso = now_utc.isoformat("T", "seconds").replace('+00:00', 'Z')
+    schema_version = 14 # TODO: Upgrade when needed
 
-    j = '{{"name":"jwlibrary-plus-backup_{0}","creationDate":"{1}","version":1,"type":0,"userDataBackup":{{"lastModifiedDate":"{2}","deviceName":"jwlibrary-plus","databaseName":"userData.db","schemaVersion":8}}}}'.format(now_date, now_date, now_iso)
+    j = '{{"name":"jwlibrary-plus-backup_{0}","creationDate":"{1}","version":1,"type":0,"userDataBackup":{{"lastModifiedDate":"{2}","deviceName":"jwlibrary-plus","databaseName":"userData.db","schemaVersion":{3}}}}}'.format(now_date, now_date, now_iso, schema_version)
     manifest = json.loads(j)
+
+    thumbnail_file = "extra/default_thumbnail.png"
 
     if(os.path.isfile(uploadedJwLibrary)):
         logger.info("Archivo .jwlibrary encontrado")
@@ -232,8 +246,8 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
         else:
             cursor.execute("SELECT max(LocationId) FROM Location")
             locationId = cursor.fetchall()[0][0] + 1
-            cursor.execute("""INSERT INTO Location (LocationId, DocumentId, IssueTagNumber, KeySymbol, MepsLanguage, Type, Title)
-            VALUES ({0}, {1}, {2}, "w", 1, 0, "{3}");""".format(locationId, documentId, articleId, title))
+            cursor.execute("""INSERT INTO Location (LocationId, DocumentId, IssueTagNumber, KeySymbol, MepsLanguage, Type)
+            VALUES ({0}, {1}, {2}, "w", 1, 0);""".format(locationId, documentId, articleId))
         
         cursor.execute("SELECT TagId FROM Tag WHERE Name = 'jwlibrary-plus'")
         tagId = cursor.fetchall()
@@ -282,18 +296,17 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
             Position = 0
 
         for i in notes:
-            uuid_value = str(uuid.uuid4())
-            uuid_value2 = str(uuid.uuid4())
+            uuid_value = str(uuid.uuid4()).upper()
+            uuid_value2 = str(uuid.uuid4()).upper()
 
             cursor.execute("""INSERT INTO UserMark ('UserMarkId', 'ColorIndex', 'LocationId', 'StyleIndex', 'UserMarkGuid', 'Version')
             VALUES ('{0}', '2', '{1}', '0', '{2}', '1');""".format(userMarkId, locationId, uuid_value))
             
-            cursor.execute ("""INSERT INTO "BlockRange" ("BlockRangeId", "BlockType", "Identifier", "StartToken", "EndToken", "UserMarkId")
+            cursor.execute("""INSERT INTO "BlockRange" ("BlockRangeId", "BlockType", "Identifier", "StartToken", "EndToken", "UserMarkId")
             VALUES ('{0}', '1', '{1}', '0', '{2}', '{3}');""".format(blockRangeId, questions[i].get("data-pid"), questions[i].text.find(".")-1, userMarkId))
             
-
-            cursor.execute("""INSERT INTO Note ("NoteId", "Guid", "UserMarkId", "LocationId", "Title", "Content", "LastModified", "BlockType", "BlockIdentifier") 
-            VALUES ('{0}', '{1}', '{2}', '{3}', '{4}', '{5}', '{6}', '1', '{7}');""".format(noteId, uuid_value2, userMarkId, locationId, questions[i].text, notes[i].replace("'", '"'), now_iso, questions[i].get("data-pid")))
+            cursor.execute("""INSERT INTO Note ("NoteId", "Guid", "UserMarkId", "LocationId", "Title", "Content", "LastModified", "Created", "BlockType", "BlockIdentifier") 
+            VALUES ('{0}', '{1}', '{2}', '{3}', '{4}', '{5}', '{6}', '{7}', '1', '{8}');""".format(noteId, uuid_value2, userMarkId, locationId, questions[i].text, notes[i].replace("'", '"'), now_iso, now_utc_iso, questions[i].get("data-pid")))
 
             cursor.execute("INSERT INTO TagMap ('TagMapId', 'NoteId', 'TagId', 'Position') VALUES ('{0}', '{1}', '{2}', '{3}')".format(tagMapId, noteId, tagId, Position))
             userMarkId += 1
@@ -309,9 +322,10 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
         connection.close()
 
         fileName = "userBackups/{0}/jwlibrary-plus-{1}-{2}.jwlibrary".format(telegram_user, documentId, now_date)
-        zf = zipfile.ZipFile(fileName, "w")
-        zf.write(uploadedDb, arcname= "userData.db") # TODO
+        zf = zipfile.ZipFile(fileName, "w", compression=zipfile.ZIP_DEFLATED)
+        zf.write(uploadedDb, arcname= "userData.db")
         zf.write(manifest_file, arcname="manifest.json")
+        zf.write(thumbnail_file, arcname="default_thumbnail.png")
         zf.close()
 
         os.remove(uploadedDb) # Remove all data from the user except the newly generated .jwlibrary file, which will be deleted after being sent
@@ -332,14 +346,14 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
         connection = sqlite3.connect(dbFromUser)
         cursor = connection.cursor()
 
-        cursor.execute("""INSERT INTO Location (LocationId, DocumentId, IssueTagNumber, KeySymbol, MepsLanguage, Type, Title)
-        VALUES (1, {0}, {1}, "w", 1, 0, "{2}");""".format(documentId, articleId, title))
+        cursor.execute("""INSERT INTO Location (LocationId, DocumentId, IssueTagNumber, KeySymbol, MepsLanguage, Type)
+        VALUES (1, {0}, {1}, "w", 1, 0);""".format(documentId, articleId))
 
         cursor.execute("INSERT INTO Tag ('TagId', 'Type', 'Name') VALUES ('2', '1', 'jwlibrary-plus')")
 
         for i in notes:
-            uuid_value = str(uuid.uuid4())
-            uuid_value2 = str(uuid.uuid4())
+            uuid_value = str(uuid.uuid4()).upper()
+            uuid_value2 = str(uuid.uuid4()).upper()
 
             cursor.execute("""INSERT INTO UserMark ('UserMarkId', 'ColorIndex', 'LocationId', 'StyleIndex', 'UserMarkGuid', 'Version')
             VALUES ('{0}', '2', '1', '0', '{1}', '1');""".format(i+1,uuid_value))
@@ -347,20 +361,21 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
             cursor.execute ("""INSERT INTO "BlockRange" ("BlockRangeId", "BlockType", "Identifier", "StartToken", "EndToken", "UserMarkId")
             VALUES ('{0}', '1', '{1}', '0', '{2}', '{3}');""".format(i+1, questions[i].get("data-pid"), questions[i].text.find(".")-1, i+1))
 
-            cursor.execute("""INSERT INTO Note ("NoteId", "Guid", "UserMarkId", "LocationId", "Title", "Content", "LastModified", "BlockType", "BlockIdentifier") 
-            VALUES ('{0}', '{1}', '{2}', '1', '{3}', '{4}', '{5}', '1', '{6}');""".format(i+1, uuid_value2, i+1, questions[i].text, notes[i].replace("'", '"'), now_iso, questions[i].get("data-pid")))
+            cursor.execute("""INSERT INTO Note ("NoteId", "Guid", "UserMarkId", "LocationId", "Title", "Content", "LastModified", "Created", "BlockType", "BlockIdentifier") 
+            VALUES ('{0}', '{1}', '{2}', '1', '{3}', '{4}', '{5}', '{6}', '1', '{7}');""".format(i+1, uuid_value2, i+1, questions[i].text, notes[i].replace("'", '"'), now_iso, now_utc_iso, questions[i].get("data-pid")))
 
             cursor.execute("INSERT INTO TagMap ('TagMapId', 'NoteId', 'TagId', 'Position') VALUES ('{0}', '{1}', '2', '{2}')".format(i+1,i+1,i))
 
-        cursor.execute("UPDATE LastModified SET LastModified = '{0}'".format(now_iso))
+        cursor.execute("UPDATE LastModified SET LastModified = '{0}'".format(now_utc_iso))
 
         connection.commit()
         connection.close()
 
         fileName = "userBackups/{0}/jwlibrary-plus-{1}-{2}.jwlibrary".format(telegram_user, documentId, now_date)
-        zf = zipfile.ZipFile(fileName, "w")
+        zf = zipfile.ZipFile(fileName, "w", compression=zipfile.ZIP_DEFLATED)
         zf.write(dbFromUser, arcname= "userData.db")
         zf.write(manifest_file, arcname="manifest.json")
+        zf.write(thumbnail_file, arcname="default_thumbnail.png")
         zf.close()
 
         os.remove(dbFromUser)    
@@ -388,7 +403,7 @@ def write_docx_pdf(documentId, title, questions, notes, telegram_user):
     document.save(fileNameDoc)
 
     fileNamePDF = "userBackups/{0}/jwlibrary-plus-{1}-{2}.pdf".format(telegram_user, documentId, now_date)
-    cmd_str = "abiword --to=pdf --to-name={0} {1}".format(fileNamePDF, fileNameDoc)
+    cmd_str = "xvfb-run abiword --to=pdf --to-name={0} {1}".format(fileNamePDF, fileNameDoc)
     subprocess.run(cmd_str, shell=True)
     return fileNameDoc, fileNamePDF
 

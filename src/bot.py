@@ -1,4 +1,5 @@
 import logging
+import gettext
 import os
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
@@ -16,23 +17,31 @@ from collections import Counter
 import telegram
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters, CallbackQueryHandler
+from telegram.error import Forbidden
 
-logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-init_questions=["Una ilustración o ejemplo para explicar algún punto principal del párrafo",
-                "Una experiencia en concreto, aportando referencias exactas de jw.org, que esté muy relacionada con el párrafo",
-                "Una explicación sobre uno de los textos que aparezcan, que aplique al párrafo. Usa la Biblia de Estudio de los Testigos de Jehová"]
+logger = logging.getLogger('mylogger')
+logger.setLevel(logging.INFO) # set logger level
+logFormatter = logging.Formatter\
+("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+consoleHandler = logging.StreamHandler(sys.stdout) #set streamhandler to stdout
+consoleHandler.setFormatter(logFormatter)
+logger.addHandler(consoleHandler)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info("START - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
-
+    
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
+    
     if user.is_bot:
-        await update.message.reply_text("Los bots no están permitidos")
+        await update.message.reply_text(_("Los bots no están permitidos"))
         return
 
-    await update.message.reply_html(rf"""😊 ¡Bienvenido! 😊
+    await update.message.reply_html(_(rf"""😊 ¡Bienvenido! 😊
 
 Este bot le ayudará a prepararse las reuniones usando técnicas avanzadas de Inteligencia Artificial, aplicadas especialmente a la relación de datos en la literatura de la organización.
 
@@ -50,9 +59,12 @@ Este bot le ayudará a prepararse las reuniones usando técnicas avanzadas de In
 
 <u>Notas Importantes:</u>
 Cada vez que ejecute /start , sus preguntas guardadas se <b>borrarán</b> y comenzará con las que el software ofrece por defecto.
-Si el bot tarda en responder, espere 15 minutos o contacte con @geiserdrums""")
+Si el bot tarda en responder, espere 15 minutos o contacte con @geiserdrums . El bot sirve a cada usuario individualmente, con lo que quizá lo esté usando otra persona, sea paciente"""))
     
-    
+    init_questions=[_("Una ilustración o ejemplo para explicar algún punto principal del párrafo"),
+                    _("Una experiencia en concreto, aportando referencias exactas de jw.org, que esté muy relacionada con el párrafo"),
+                    _("Una explicación sobre uno de los textos que aparezcan, que aplique al párrafo. Usa la Traducción del Nuevo Mundo (edición de estudio) de la Biblia de los Testigos de Jehová")]
+
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
     cursor.execute("INSERT OR IGNORE INTO Main (UserId) VALUES ('{0}')".format(user.id))
@@ -62,8 +74,17 @@ Si el bot tarda en responder, espere 15 minutos o contacte con @geiserdrums""")
     connection.close()
 
 
+
+
+
 async def select_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("Testeando URL, espere por favor")
+    user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
+    await update.message.reply_text(_("Testeando URL, espere por favor"))
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=telegram.constants.ChatAction.TYPING)
     url = context.args[0]
     user = update.effective_user
@@ -78,220 +99,85 @@ async def select_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             connection.close()
             title, articleId, articleN = core_worker.w_extract_html(url, get_all=False)
             articleNformatted = articleN.lower().split(" ")[-1]
-            await update.message.reply_html("URL guardada.\nEn esta URL se encuentra la revista del año <b>{0}</b>, número <b>{1}</b>, artículo de estudio <b>{2}</b>.\nEl título de la Atalaya es <b>{3}</b>".format(articleId[:4], articleId[4:-2], articleNformatted, title))
+            await update.message.reply_html(_("URL guardada.\nEn esta URL se encuentra la revista del año <b>{0}</b>, número <b>{1}</b>, artículo de estudio <b>{2}</b>.\nEl título de la Atalaya es <b>{3}</b>").format(articleId[:4], articleId[4:-2], articleNformatted, title))
         else:
-            await update.message.reply_text("No es un una URL de www.jw.org")
+            await update.message.reply_text(_("No es un una URL de www.jw.org"))
     else:
-        await update.message.reply_text("No es un una URL válida")
+        await update.message.reply_text(_("No es un una URL válida"))
 
-
-async def q1(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    question = ' '.join(context.args[:]).replace('"', '').replace("'", "").replace(";", "").replace("(", "").replace(")", "") # TODO: Prevent user from messing with the input
+async def save_question(update: Update, context: ContextTypes.DEFAULT_TYPE, question_number: int) -> None:
     user = update.effective_user
-    logger.info("Q1 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
+    question = ' '.join(context.args[:]).replace('"', '').replace("'", "").replace(";", "").replace("(", "").replace(")", "")  # TODO: Prevent user from messing with the input
+    user = update.effective_user
+    logger.info("Q{0} - User ID: {1} - First Name: {2} - Last Name: {3} - Username: {4} - Language Code: {5} - Question: {6}".format(question_number, user.id, user.first_name, user.last_name, user.username, user.language_code, question))
     if(len(question) < 200):
-        function_name = sys._getframe().f_code.co_name.upper()
+        function_name = f"Q{question_number}"
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
+        if question_number > 1:
+            cursor.execute("SELECT Q{0} FROM Main WHERE UserId = {1}".format(question_number - 1, user.id))
+            prev_q = cursor.fetchall()
+            if prev_q == [(None,)] or prev_q == []:
+                await update.message.reply_text(_("Rellene la pregunta anterior o anteriores antes de guardar la siguiente"))
+                return
         cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user.id))
         connection.commit()
         connection.close()
-        await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
+        await update.message.reply_text(_("Pregunta {0} guardada correctamente").format(question_number))
     else:
-        await update.message.reply_text("La pregunta debe tener menos de 200 caracteres")
+        await update.message.reply_text(_("La pregunta debe tener menos de 200 caracteres"))
 
-
+async def q1(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await save_question(update, context, 1)
 
 async def q2(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    question = ' '.join(context.args[:])
-    user = update.effective_user
-    logger.info("Q2 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
-    if(len(question) < 200):
-        function_name = sys._getframe().f_code.co_name.upper()
-        connection = sqlite3.connect("dbs/main.db")
-        cursor = connection.cursor()
-        cursor.execute("SELECT Q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user.id))
-        prev_q = cursor.fetchall()
-        if(prev_q == [(None,)] or prev_q == []):
-            await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
-        else:
-            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user.id))
-            connection.commit()
-            connection.close()
-            await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
-    else:
-        await update.message.reply_text("La pregunta debe tener menos de 200 caracteres")
+    await save_question(update, context, 2)
         
 
 async def q3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    question = ' '.join(context.args[:])
-    user = update.effective_user
-    logger.info("Q3 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
-    if(len(question) < 200):
-        function_name = sys._getframe().f_code.co_name.upper()
-        connection = sqlite3.connect("dbs/main.db")
-        cursor = connection.cursor()
-        cursor.execute("SELECT Q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user.id))
-        prev_q = cursor.fetchall()
-        if(prev_q == [(None,)] or prev_q == []):
-            await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
-        else:
-            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user.id))
-            connection.commit()
-            connection.close()
-            await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
-    else:
-        await update.message.reply_text("La pregunta debe tener menos de 200 caracteres")
+    await save_question(update, context, 3)
         
         
 async def q4(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    question = ' '.join(context.args[:])
-    user = update.effective_user
-    logger.info("Q4 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
-    if(len(question) < 200):
-        function_name = sys._getframe().f_code.co_name.upper()
-        connection = sqlite3.connect("dbs/main.db")
-        cursor = connection.cursor()
-        cursor.execute("SELECT Q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user.id))
-        prev_q = cursor.fetchall()
-        if(prev_q == [(None,)] or prev_q == []):
-            await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
-        else:
-            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user.id))
-            connection.commit()
-            connection.close()
-            await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
-    else:
-        await update.message.reply_text("La pregunta debe tener menos de 200 caracteres")
+    await save_question(update, context, 4)
         
 
 async def q5(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    question = ' '.join(context.args[:])
-    user = update.effective_user
-    logger.info("Q5 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
-    if(len(question) < 200):
-        function_name = sys._getframe().f_code.co_name.upper()
-        connection = sqlite3.connect("dbs/main.db")
-        cursor = connection.cursor()
-        cursor.execute("SELECT Q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user.id))
-        prev_q = cursor.fetchall()
-        if(prev_q == [(None,)] or prev_q == []):
-            await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
-        else:
-            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user.id))
-            connection.commit()
-            connection.close()
-            await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
-    else:
-        await update.message.reply_text("La pregunta debe tener menos de 200 caracteres")
+    await save_question(update, context, 5)
         
 
 async def q6(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    question = ' '.join(context.args[:])
-    user = update.effective_user
-    logger.info("Q6 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
-    if(len(question) < 200):
-        function_name = sys._getframe().f_code.co_name.upper()
-        connection = sqlite3.connect("dbs/main.db")
-        cursor = connection.cursor()
-        cursor.execute("SELECT Q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user.id))
-        prev_q = cursor.fetchall()
-        if(prev_q == [(None,)] or prev_q == []):
-            await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
-        else:
-            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user.id))
-            connection.commit()
-            connection.close()
-            await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
-    else:
-        await update.message.reply_text("La pregunta debe tener menos de 200 caracteres")
+    await save_question(update, context, 6)
         
 
 async def q7(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    question = ' '.join(context.args[:])
-    user = update.effective_user
-    logger.info("Q7 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
-    if(len(question) < 200):
-        function_name = sys._getframe().f_code.co_name.upper()
-        connection = sqlite3.connect("dbs/main.db")
-        cursor = connection.cursor()
-        cursor.execute("SELECT Q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user.id))
-        prev_q = cursor.fetchall()
-        if(prev_q == [(None,)] or prev_q == []):
-            await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
-        else:
-            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user.id))
-            connection.commit()
-            connection.close()
-            await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
-    else:
-        await update.message.reply_text("La pregunta debe tener menos de 200 caracteres")
+    await save_question(update, context, 7)
         
 
 async def q8(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    question = ' '.join(context.args[:])
-    user = update.effective_user
-    logger.info("Q8 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
-    if(len(question) < 200):
-        function_name = sys._getframe().f_code.co_name.upper()
-        connection = sqlite3.connect("dbs/main.db")
-        cursor = connection.cursor()
-        cursor.execute("SELECT Q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user.id))
-        prev_q = cursor.fetchall()
-        if(prev_q == [(None,)] or prev_q == []):
-            await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
-        else:
-            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user.id))
-            connection.commit()
-            connection.close()
-            await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
-    else:
-        await update.message.reply_text("La pregunta debe tener menos de 200 caracteres")
+    await save_question(update, context, 8)
 
 
 async def q9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    question = ' '.join(context.args[:])
-    user = update.effective_user
-    logger.info("Q9 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
-    if(len(question) < 200):
-        function_name = sys._getframe().f_code.co_name.upper()
-        connection = sqlite3.connect("dbs/main.db")
-        cursor = connection.cursor()
-        cursor.execute("SELECT Q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user.id))
-        prev_q = cursor.fetchall()
-        if(prev_q == [(None,)] or prev_q == []):
-            await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
-        else:
-            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user.id))
-            connection.commit()
-            connection.close()
-            await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
-    else:
-        await update.message.reply_text("La pregunta debe tener menos de 200 caracteres")
+    await save_question(update, context, 9)
 
 
 async def q10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    question = ' '.join(context.args[:])
-    user = update.effective_user
-    logger.info("Q10 - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Question: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, question))
-    if(len(question) < 200):
-        function_name = sys._getframe().f_code.co_name.upper()
-        connection = sqlite3.connect("dbs/main.db")
-        cursor = connection.cursor()
-        cursor.execute("SELECT Q{0} FROM Main WHERE UserId = {1}".format(int(function_name[1:])-1, user.id))
-        prev_q = cursor.fetchall()
-        if(prev_q == [(None,)] or prev_q == []):
-            await update.message.reply_text("Rellene la pregunta anterior o anteriores antes de guardar la siguiente")
-        else:
-            cursor.execute("UPDATE Main SET {0} = '{1}' WHERE UserId = {2}".format(function_name, question, user.id))
-            connection.commit()
-            connection.close()
-            await update.message.reply_text("Pregunta {0} guardada correctamente".format(function_name[1:]))
-    else:
-        await update.message.reply_text("La pregunta debe tener menos de 200 caracteres")
+    await save_question(update, context, 10)
 
 
 async def show_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
     user = update.effective_user
     logger.info("SHOW_Q - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
     
@@ -302,7 +188,7 @@ async def show_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     connection.close()
 
     num_questions = 10
-    questions_text = "<u>Tus preguntas actuales:</u>\n"
+    questions_text = _("<u>Tus preguntas actuales:</u>\n")
     for i in range(num_questions):
         if i < len(data) and data[i] != None:
             questions_text += "{0}. {1}\n".format(i+1, data[i])
@@ -311,6 +197,12 @@ async def show_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def delete_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
     user = update.effective_user
     logger.info("DELETE_Q - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
     
@@ -321,12 +213,18 @@ async def delete_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     connection.commit()
     connection.close()
 
-    await update.message.reply_html("Todas las preguntas que estaban guardadas han sido eliminadas")
+    await update.message.reply_html(_("Todas las preguntas que estaban guardadas han sido eliminadas"))
 
 async def set_all_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None: # Not working because there is no \n in input
+    user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
     logger.info(context.args)
     user = update.effective_user
-    questions_user = update.effective_message.text.removeprefix("/set_all_q").removeprefix("@jwlibrary_plus_dev_bot").removeprefix("@jwlibrary_plus_bot").replace('"', '').replace("'", "").replace(";", "").replace("(", "").replace(")", "") # TODO: Prevent user from messing with the input
+    questions_user = update.effective_message.text.removeprefix("/q_set_all").removeprefix("@jwlibrary_plus_dev_bot").removeprefix("@jwlibrary_plus_bot").replace('"', '').replace("'", "").replace(";", "").replace("(", "").replace(")", "") # TODO: Prevent user from messing with the input
     logger.info("BULK_Q - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Questions from User: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, questions_user))
     
     await delete_q(update, context)
@@ -342,54 +240,84 @@ async def set_all_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     connection.commit()
     connection.close()
 
-    await update.message.reply_text("La serie de preguntas introducida ha sido guardada con éxito")
+    await update.message.reply_text(_("La serie de preguntas introducida ha sido guardada con éxito"))
 
 async def send_backup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
+    user = update.effective_user
     logger.info("SEND_BACKUP - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
-    await update.message.reply_html("Envíe su archivo <code>.jwlibrary</code> cuando desee, siempre será tomado en cuenta el último archivo que suba")
+    await update.message.reply_html(_("Envíe su archivo <code>.jwlibrary</code> cuando desee, siempre será tomado en cuenta el último archivo que suba"))
 
 
 async def downloader(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
     user = update.effective_user
     file = await context.bot.get_file(update.message.document)
     logger.info("SENDBACKUP - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - File ID: {5} - File Path: {6}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, file.file_id, file.file_path))
 
     if(file.file_path.endswith(".jwlibrary")):
         await file.download_to_drive('/app/userBackups/{0}.jwlibrary'.format(user.id))
-        await update.message.reply_text("Archivo correctamente subido y listo para utilizar")
+        await update.message.reply_text(_("Archivo correctamente subido y listo para utilizar"))
     else:
-        await update.message.reply_text("Formato de archivo erróneo")
+        await update.message.reply_text(_("Formato de archivo erróneo"))
 
 
 async def delete_backup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
+    user = update.effective_user
     logger.info("DELETE_BACKUP - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
     
     os.remove('/app/userBackups/{0}.jwlibrary'.format(user.id))
-    await update.message.reply_html("Archivo <code>.jwlibrary</code> eliminado del servidor")
+    await update.message.reply_html(_("Archivo <code>.jwlibrary</code> eliminado del servidor"))
 
 
 async def describe_backup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
     user = update.effective_user
     logger.info("DESCRIBE_BACKUP - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
     
     jwfile = "userBackups/{0}.jwlibrary".format(user.id)
     if os.path.isfile(jwfile):
         notesN, inputN, tagMaptN, tagN, bookmarkN, lastModified, userMarkN = core_worker.describe_jwlibrary(user.id)
-        await update.message.reply_html("""Estado de su archivo <code>.jwlibrary</code>:
+        await update.message.reply_html(_("""Estado de su archivo <code>.jwlibrary</code>:
 <u>Notas:</u> {0}
 <u>Tags individuales:</u> {1}
 <u>Notas con tags:</u> {2}
 <u>Escritos en cuadros de texto:</u> {3}
 <u>Favoritos:</u> {4}
 <u>Frases subrayadas:</u> {5}
-<u>Última vez modificado:</u> {6}""".format(notesN, tagN, tagMaptN, inputN, bookmarkN, userMarkN, lastModified))
+<u>Última vez modificado:</u> {6}""").format(notesN, tagN, tagMaptN, inputN, bookmarkN, userMarkN, lastModified))
     else:
-        await update.message.reply_text("No se ha encontrado su archivo. El fichero se borra tras computar el resultado, envíelo de nuevo actualizado")
+        await update.message.reply_text(_("No se ha encontrado su archivo. El fichero se borra tras computar el resultado, envíelo de nuevo actualizado"))
 
 
 async def show_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
     user = update.effective_user
     logger.info("SHOW_URL - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
     connection = sqlite3.connect("dbs/main.db")
@@ -400,12 +328,18 @@ async def show_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     logger.info(url)
     if url:
-        await update.message.reply_html("La URL configurada es {0}".format(url))
+        await update.message.reply_html(_("La URL configurada es {0}").format(url))
     else:
-        await update.message.reply_text("No hay URL configurada")
+        await update.message.reply_text(_("No hay URL configurada"))
 
 
 async def delete_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
     user = update.effective_user
     logger.info("DELETE_URL - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
 
@@ -416,13 +350,19 @@ async def delete_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     if url:
         cursor.execute("UPDATE Main SET Url = null WHERE UserId = '{0}'".format(user.id))
-        await update.message.reply_text("URL eliminada")
+        await update.message.reply_text(_("URL eliminada"))
     #TODO: else condicional. Si proviene de /delete_url , ejecutar else, si proviene de /select_date, no ejecutar else.
     connection.commit()
     connection.close()
 
 
 async def select_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
     user = update.effective_user
     logger.info("SELECT_DATE - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
 
@@ -444,10 +384,16 @@ async def select_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         keyboard.append([InlineKeyboardButton(button, callback_data=i)])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await update.message.reply_text('Elija fecha:', reply_markup=reply_markup)
+    await update.message.reply_text(_('Elija fecha:'), reply_markup=reply_markup)
 
 
 async def select_date_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
     user = update.effective_user
     logger.info("SELECT_DATE_BUTTON - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
 
@@ -455,15 +401,15 @@ async def select_date_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.answer()
 
     if query.data == "0":
-        msg = "Semana actual"
+        msg = _("Semana actual")
     elif query.data == "1":
-        msg = "Semana próxima"
+        msg = _("Semana próxima")
     elif query.data == "2":
-        msg = "Dentro de 2 semanas"
+        msg = _("Dentro de 2 semanas")
     elif query.data == "3":
-        msg = "Dentro de 3 semanas" 
+        msg = _("Dentro de 3 semanas") 
 
-    await query.edit_message_text(text="Opción seleccionada: {0}".format(msg))
+    await query.edit_message_text(text=_("Opción seleccionada: {0}").format(msg))
 
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
@@ -474,30 +420,45 @@ async def select_date_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def show_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
+    user = update.effective_user
     logger.info("SHOW_DATE - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
     
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
     cursor.execute("SELECT WeekDelta FROM Main WHERE UserId = {0}".format(user.id))
     date = cursor.fetchall()[0][0]
+    if not date:
+        date=0
     connection.close()
 
     if str(date):
         if date == 0:
-            msg = "Semana actual"
+            msg = _("Semana actual")
         elif date == 1:
-            msg = "Semana próxima"
+            msg = _("Semana próxima")
         elif date == 2:
-            msg = "Dentro de 2 semanas"
+            msg = _("Dentro de 2 semanas")
         elif date == 3:
-            msg = "Dentro de 3 semanas" 
+            msg = _("Dentro de 3 semanas")
+        
 
-        await update.message.reply_html("Semana configurada: <b>{0}</b>".format(msg))
+        await update.message.reply_html(_("Semana configurada: <b>{0}</b>").format(msg))
     else:
-        await update.message.reply_text("No hay semana configurada")
+        await update.message.reply_text(_("No hay semana configurada"))
 
 
 async def delete_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
     user = update.effective_user
     logger.info("DELETE_DATE - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
     
@@ -507,33 +468,45 @@ async def delete_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     date = cursor.fetchall()[0][0]
     if str(date):
         cursor.execute("UPDATE Main SET WeekDelta = null WHERE UserId = '{0}'".format(user.id))
-        await update.message.reply_text("Semana eliminada")
+        await update.message.reply_text(_("Semana eliminada"))
     else:
-        await update.message.reply_text("Semana no encontrada")
+        await update.message.reply_text(_("Semana no encontrada"))
     connection.commit()
     connection.close()
 
 
-async def select_color(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user = update.effective_user
-    logger.info("SELECT_COLOR - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
+# async def select_color(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # user = update.effective_user
+    # domain = "jwlibraryplus"
+    # locale_dir = "../locales"
+    # target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    # translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    # _ = translation.gettext
+#     user = update.effective_user
+#     logger.info("SELECT_COLOR - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
     
-    colors = ["Sin Color", "Amarillo", "Verde", "Azul", "Rosa", "Naranja", "Violeta"]
+#     colors = ["Sin Color", "Amarillo", "Verde", "Azul", "Rosa", "Naranja", "Violeta"]
 
-    keyboard = []
-    for i, button in enumerate(colors):
-        keyboard.append([InlineKeyboardButton(button, callback_data=i)])
-    reply_markup = InlineKeyboardMarkup(keyboard)
+#     keyboard = []
+#     for i, button in enumerate(colors):
+#         keyboard.append([InlineKeyboardButton(button, callback_data=i)])
+#     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await update.message.reply_text('Elija fecha:', reply_markup=reply_markup)
+#     await update.message.reply_text('Elija fecha:', reply_markup=reply_markup)
 
-async def select_color_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query
-    await query.answer()
-    await query.edit_message_text(text=f"Selected option: {query.data}")
-    # TODO
+# async def select_color_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+#     query = update.callback_query
+#     await query.answer()
+#     await query.edit_message_text(text=f"Selected option: {query.data}")
+#     # TODO
 
 async def admin_broadcast_msg(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
     user = update.effective_user
     msg = update.message.text.removeprefix("/admin_broadcast_msg").removeprefix("@jwlibrary_plus_dev_bot").removeprefix("@jwlibrary_plus_bot")
     logger.info("ADMIN_BROADCAST_MSG - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4} - Message: {5}".format(user.id, user.first_name, user.last_name, user.username, user.language_code, msg))
@@ -548,21 +521,39 @@ async def admin_broadcast_msg(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def default_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
+    user = update.effective_user
     logger.info("DEFAULT_MESSAGE - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
 
-    await update.message.reply_text("Este bot solo funciona a través de comandos. Por ejemplo, para introducir la pregunta 1, mande un mensaje con /q1 [PREGUNTA], sin los corchetes, e incluya su propia pregunta")
+    await update.message.reply_text(_("Este bot solo funciona a través de comandos. Por ejemplo, para introducir la pregunta 1, mande un mensaje con /q1 [PREGUNTA], sin los corchetes, e incluya su propia pregunta"))
 
 async def default_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
+    user = update.effective_user
     logger.info("DEFAULT_COMMAND - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
 
-    await update.message.reply_text("Ha introducido un comando erróneo. Revise por favor la lista de comandos admitidos enviando el mensaje /start o haga click en el botón azul a la izquierda del cuadro de texto llamado 'Menú'")
+    await update.message.reply_text(_("Ha introducido un comando erróneo. Revise por favor la lista de comandos admitidos enviando el mensaje /start o haga click en el botón azul a la izquierda del cuadro de texto llamado 'Menú'"))
 
 async def language_select(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
+    user = update.effective_user
     logger.info("LANGUAGE_SELECT - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
 
-    # TODO: Add language selection
+
     languages = ["English", "Español"]
 
     keyboard = []
@@ -572,10 +563,16 @@ async def language_select(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
+    domain = "jwlibraryplus"
+    locale_dir = "../locales"
+    target_language = user.language_code # TODO: las siguientes veces, cogerlo de la BBDD que es el bueno, no el lenguaje de Telegram
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[target_language], fallback=True)
+    _ = translation.gettext
+    user = update.effective_user
     logger.info("W_PREPARE - User ID: {0} - First Name: {1} - Last Name: {2} - Username: {3} - Language Code: {4}".format(user.id, user.first_name, user.last_name, user.username, user.language_code))
     await user.send_chat_action(action=telegram.constants.ChatAction.TYPING)
     
-    await update.message.reply_text("Inicializando. Por favor, espere")
+    await update.message.reply_text(_("Inicializando. Por favor, espere"))
     
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
@@ -583,6 +580,8 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     url = cursor.fetchall()[0][0]
     cursor.execute("SELECT WeekDelta FROM Main WHERE UserId = {0} LIMIT 1".format(user.id))
     date = cursor.fetchall()[0][0]
+    if not date:
+        date=0
     cursor.execute("SELECT Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q10 FROM Main WHERE UserId = {0} LIMIT 1".format(user.id))
     qs = cursor.fetchall()[0]
     cursor.execute("SELECT LastRun FROM Main WHERE UserId = {0} LIMIT 1".format(user.id))
@@ -592,10 +591,12 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     now = datetime.now(pytz.timezone('Europe/Madrid')) # TODO: Check if UTC better
     now_iso = now.isoformat("T", "seconds")
+    now_utc = now.astimezone(pytz.UTC)
+    now_utc_iso = now_utc.isoformat("T", "seconds").replace('+00:00', 'Z')
     
     if lastRun is not None:
         if str(datetime.fromisoformat(lastRun).date()) == str(now.date()) and (user.id not in [5978895313, 835003]): # My test accounts
-            await update.message.reply_text("Ya se ha preparado la reunión hoy. Por favor, vuelva a intentarlo mañana. El servicio tiene un coste. Si cree que hay un error, contacte con @geiserdrums")
+            await update.message.reply_text(_("Ya se ha preparado la reunión hoy. Por favor, vuelva a intentarlo mañana. El servicio tiene un coste. Si cree que hay un error, contacte con @geiserdrums"))
             return
         else:
             cursor.execute("UPDATE Main SET LastRun = '{0}' WHERE UserId = '{1}'".format(now_iso, user.id))
@@ -608,7 +609,7 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if any(qs):
         if (url is not None) and (date is not None):
-            await update.message.reply_text("Tiene guardados una fecha y una URL. Se está tomando la fecha como valor predeterminado. Si quiere usar la URL, borre la fecha con /date_delete")
+            await update.message.reply_text(_("Tiene guardados una fecha y una URL. Se está tomando la fecha como valor predeterminado. Si quiere usar la URL, borre la fecha con /date_delete"))
         if date is not None:
             start_date = now - timedelta(days=now.weekday()) + timedelta(int(date)*7)
             dates = []
@@ -655,25 +656,25 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await select_url(update, context)
 
         if (url is not None) or (date is not None):
-            await update.message.reply_text("Comenzando peticiones a ChatGPT. Podría tardar incluso más de 10 minutos dependiendo del número de preguntas que haya configurado y su velocidad de respuesta")
+            await update.message.reply_text(_("Comenzando peticiones a ChatGPT. Podría tardar incluso más de 10 minutos dependiendo del número de preguntas que haya configurado y su velocidad de respuesta"))
             filenamejw, filenamedoc, filenamepdf = core_worker.main(url, user.id, qs)
             if(os.path.isfile('userBackups/{0}.jwlibrary'.format(user.id))):
-                await update.message.reply_text("Aquí tiene su fichero, impórtelo a JW Library. Recuerde hacer una <b>copia de seguridad</b> para no perder los datos, ya que no ha proporcionado su archivo .jwlibrary")
+                await update.message.reply_text(_("Aquí tiene su fichero, impórtelo a JW Library. Recuerde hacer una <b>copia de seguridad</b> para no perder los datos, ya que no ha proporcionado su archivo .jwlibrary"))
             else:
-                await update.message.reply_text("Aquí tiene su fichero, impórtelo a JW Library. Al haber proporcionado su copia de seguridad, puede estar seguro de que no perderá datos aun si se corrompiera su app, ya que dispone de cómo restaurarla")
+                await update.message.reply_text(_("Aquí tiene su fichero, impórtelo a JW Library. Al haber proporcionado su copia de seguridad, puede estar seguro de que no perderá datos aun si se corrompiera su app, ya que dispone de cómo restaurarla"))
             await update.message.reply_document(document=open(filenamejw, "rb"))
             os.remove(filenamejw)
 
-            await update.message.reply_text("Aquí también encontrará los archivos en formato Word y PDF")
+            await update.message.reply_text(_("Aquí también encontrará los archivos en formato Word y PDF"))
             await update.message.reply_document(document=open(filenamedoc, "rb"))
             await update.message.reply_document(document=open(filenamepdf, "rb"))
             os.remove(filenamedoc)
             os.remove(filenamepdf)
 
         else:
-            await update.message.reply_text("No ha seleccionado ninguna fecha o URL")
+            await update.message.reply_text(_("No ha seleccionado ninguna fecha o URL"))
     else:
-        await update.message.reply_text("Todas las preguntas están vacías")
+        await update.message.reply_text(_("Todas las preguntas están vacías"))
 
 
 def main() -> None:

@@ -1,4 +1,4 @@
-pyrogram==2.0.104
+pyrogram==2.0.106
 #telethon==1.28.5
 #tgcrypto==1.2.5
 #uvloop==0.17.0
