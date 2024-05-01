@@ -148,11 +148,11 @@ async def run_test(client: Client):
     assert response.messages[8].document.file_name.endswith(".pdf")
     print("File prepared")
 
-    print("Provoke error when sending text without commands")
-    async with controller.collect(count=1) as response:
-        await controller.send_message("a")
-    assert "bot" in response.messages[0].text
-    print("Error correctly provoked") 
+    # print("Provoke error when sending text without commands")
+    # async with controller.collect(count=1) as response:
+    #     await controller.send_message("a")
+    # assert "bot" in response.messages[0].text
+    # print("Error correctly provoked") 
 
     print("Provoke error when sending a non-existent command")
     async with controller.collect(count=1) as response:

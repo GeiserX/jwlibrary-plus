@@ -1,7 +1,7 @@
 FROM python:3.12-slim-bullseye
 
 WORKDIR /app
-RUN apt-get update && apt-get install -y locales-all abiword build-essential xvfb
+RUN apt-get update && apt-get install -y locales-all abiword build-essential xvfb sqlite3
 RUN mkdir userBackups
 
 COPY requirements.txt /app/requirements.txt

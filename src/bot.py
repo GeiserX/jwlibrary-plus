@@ -20,10 +20,9 @@ from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandl
 from telegram.error import Forbidden
 
 logger = logging.getLogger('mylogger')
-logger.setLevel(logging.INFO) # set logger level
-logFormatter = logging.Formatter\
-("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-consoleHandler = logging.StreamHandler(sys.stdout) #set streamhandler to stdout
+logger.setLevel(logging.INFO)
+logFormatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+consoleHandler = logging.StreamHandler(sys.stdout)
 consoleHandler.setFormatter(logFormatter)
 logger.addHandler(consoleHandler)
 
@@ -78,10 +77,20 @@ Si el bot tarda en responder, espere 15 minutos o contacte con @geiserdrums . El
     connection.close()
 
 
+async def check_if_user_exists(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    connection = sqlite3.connect("dbs/main.db")
+    cursor = connection.cursor()
+    cursor.execute("SELECT COUNT(*) FROM Main WHERE UserId = {0}".format(user.id))
+    count = cursor.fetchone()[0]
+    connection.close()
+
+    if count == 0:
+        await start(update, context)
 
 
-
-async def select_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def select_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:   
+    await check_if_user_exists(update, context)
     user = update.effective_user
     domain = "jwlibraryplus"
     locale_dir = "../locales"
@@ -110,6 +119,7 @@ async def select_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         await update.message.reply_text(_("No es un una URL válida"))
 
 async def save_question(update: Update, context: ContextTypes.DEFAULT_TYPE, question_number: int) -> None:
+    await check_if_user_exists(update, context)
     user = update.effective_user
     domain = "jwlibraryplus"
     locale_dir = "../locales"
@@ -176,6 +186,7 @@ async def q10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def show_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await check_if_user_exists(update, context)
     user = update.effective_user
     domain = "jwlibraryplus"
     locale_dir = "../locales"
@@ -201,6 +212,7 @@ async def show_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def delete_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await check_if_user_exists(update, context)
     user = update.effective_user
     domain = "jwlibraryplus"
     locale_dir = "../locales"
@@ -220,6 +232,7 @@ async def delete_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_html(_("Todas las preguntas que estaban guardadas han sido eliminadas"))
 
 async def set_all_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None: # Not working because there is no \n in input
+    await check_if_user_exists(update, context)
     user = update.effective_user
     domain = "jwlibraryplus"
     locale_dir = "../locales"
@@ -247,6 +260,7 @@ async def set_all_q(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(_("La serie de preguntas introducida ha sido guardada con éxito"))
 
 async def send_backup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await check_if_user_exists(update, context)
     user = update.effective_user
     domain = "jwlibraryplus"
     locale_dir = "../locales"
@@ -259,6 +273,7 @@ async def send_backup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 
 async def downloader(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await check_if_user_exists(update, context)
     user = update.effective_user
     domain = "jwlibraryplus"
     locale_dir = "../locales"
@@ -277,6 +292,7 @@ async def downloader(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def delete_backup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await check_if_user_exists(update, context)
     user = update.effective_user
     domain = "jwlibraryplus"
     locale_dir = "../locales"
@@ -291,6 +307,7 @@ async def delete_backup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 async def describe_backup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await check_if_user_exists(update, context)
     user = update.effective_user
     domain = "jwlibraryplus"
     locale_dir = "../locales"
@@ -316,6 +333,7 @@ async def describe_backup(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 async def show_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await check_if_user_exists(update, context)
     user = update.effective_user
     domain = "jwlibraryplus"
     locale_dir = "../locales"
@@ -338,6 +356,7 @@ async def show_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def delete_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await check_if_user_exists(update, context)
     user = update.effective_user
     domain = "jwlibraryplus"
     locale_dir = "../locales"
@@ -361,6 +380,7 @@ async def delete_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def select_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await check_if_user_exists(update, context)
     user = update.effective_user
     domain = "jwlibraryplus"
     locale_dir = "../locales"
@@ -392,6 +412,7 @@ async def select_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 
 async def select_date_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await check_if_user_exists(update, context)
     user = update.effective_user
     domain = "jwlibraryplus"
     locale_dir = "../locales"
@@ -423,6 +444,7 @@ async def select_date_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def show_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await check_if_user_exists(update, context)
     user = update.effective_user
     domain = "jwlibraryplus"
     locale_dir = "../locales"
@@ -457,6 +479,7 @@ async def show_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def delete_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await check_if_user_exists(update, context)
     user = update.effective_user
     domain = "jwlibraryplus"
     locale_dir = "../locales"
@@ -505,6 +528,7 @@ async def delete_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 #     # TODO
 
 async def admin_broadcast_msg(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await check_if_user_exists(update, context)
     user = update.effective_user
     domain = "jwlibraryplus"
     locale_dir = "../locales"
@@ -524,6 +548,7 @@ async def admin_broadcast_msg(update: Update, context: ContextTypes.DEFAULT_TYPE
             await context.bot.send_message(chat_id=user[0], text=msg)
 
 async def default_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await check_if_user_exists(update, context)
     user = update.effective_user
     domain = "jwlibraryplus"
     locale_dir = "../locales"
@@ -536,6 +561,7 @@ async def default_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await update.message.reply_text(_("Este bot solo funciona a través de comandos. Por ejemplo, para introducir la pregunta 1, mande un mensaje con /q1 [PREGUNTA], sin los corchetes, e incluya su propia pregunta"))
 
 async def default_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await check_if_user_exists(update, context)
     user = update.effective_user
     domain = "jwlibraryplus"
     locale_dir = "../locales"
@@ -548,6 +574,7 @@ async def default_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await update.message.reply_text(_("Ha introducido un comando erróneo. Revise por favor la lista de comandos admitidos enviando el mensaje /start o haga click en el botón azul a la izquierda del cuadro de texto llamado 'Menú'"))
 
 async def language_select(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await check_if_user_exists(update, context)
     user = update.effective_user
     domain = "jwlibraryplus"
     locale_dir = "../locales"
@@ -566,6 +593,7 @@ async def language_select(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     reply_markup = InlineKeyboardMarkup(keyboard)
 
 async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await check_if_user_exists(update, context)
     user = update.effective_user
     domain = "jwlibraryplus"
     locale_dir = "../locales"
