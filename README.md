@@ -3,7 +3,7 @@
 
 [![jwlibrary-plus compliant](https://img.shields.io/github/license/GeiserX/jwlibrary-plus)](https://github.com/GeiserX/jwlibrary-plus/blob/main/LICENSE)
 
-This project is a Telegram bot assistant to help you prepare for Jehovah's Witnesses weekend meetings. It uses ChatGPT 3.5-turbo to write contextual notes for each paragraph, with configurable inputs.
+This project is a Telegram bot assistant to help you prepare for Jehovah's Witnesses weekend meetings. It uses ChatGPT-4-turbo to write contextual notes for each paragraph, with configurable inputs.
 
 ## Table of Contents
 
