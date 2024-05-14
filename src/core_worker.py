@@ -22,11 +22,7 @@ from langchain.globals import set_llm_cache
 #from langchain_community.callbacks import get_openai_callback
 cache = SQLiteCache(database_path="/app/dbs/langchain.db")
 set_llm_cache(cache)
-#from langchain.chat_models import ChatOpenAI
-# from langchain.cache import SQLiteCache, InMemoryCache, GPTCache
-# from gptcache import Cache
-# from gptcache.manager.factory import manager_factory
-# from gptcache.processor.pre import get_prompt
+
 from langchain.chains import ConversationChain
 from langchain.memory import ConversationBufferMemory
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder, SystemMessagePromptTemplate, HumanMessagePromptTemplate
@@ -34,12 +30,6 @@ from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder, SystemMes
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# def init_gptcache(cache_obj: Cache, llm: str):
-#     cache_obj.init(
-#         pre_embedding_func=get_prompt,
-#         data_manager=manager_factory(manager="sqlite,faiss,local", data_dir=f"dbs/map_cache_{llm}", vector_params={"dimension": "128"}, max_size=100000),
-#     )
 
 #######################################
 ### HELPER: DESCRIBE JWLIBRARY FILE ###
@@ -128,50 +118,19 @@ def mwb_extract_html(url, get_all): # TODO
     study_html = requests.get("https://wol.jw.org" + study).text
     soup_study = BeautifulSoup(study_html, features="html5lib")
 
-
-
-    # title = soup.find("h1").text
-    # classArticleId = soup.find("article", {"id" : "article"}).get("class")
-    # articleId = next(x for x in classArticleId if x.startswith("iss"))[4:] + "00"
-    # articleN = soup.find("p", {"id":"p1"}).text
-
-    # if get_all:
-    #     base_text = soup.find("p", {"id":"p3"}).text
-    #     song = soup.find("p",{"id":"p4"}).text
-    #     summary = soup.find("div", {"id": "footnote1"}).find("p").text
-    #     documentId = soup.find("input", {"name": "docid"}).get("value")
-    #     p_elements = soup.find("div", {"class":"bodyTxt"})
-    #     questions = p_elements.find_all("p", {"id": lambda x: x and x.startswith("q")})
-    #     paragraphs = p_elements.find_all("p", {"id": lambda x: x and x.startswith("p")})
-
-    #     # Example q_map = {0 : [q1, [p1]], 1 : [q2&3, [p2, p3]]}
-    #     q_map = {}
-    #     i = 0
-    #     for q in questions:
-    #         q_map[i] = [q]
-    #         q_map[i].append([p for p in paragraphs if p.has_attr('data-rel-pid') if p.get('data-rel-pid').strip('[]') in q.get('data-pid')])
-    #         i = i+1
-        
-    #     return title, base_text, song, summary, questions, documentId, articleId, q_map
-    # else:
-    #     return title, articleId, articleN
-
 ####################
 ### QUERY OPENAI ###
 ####################
 
 def w_query_openai(title, base_text, song, summary, q_map, qs_user):
     logger.info("w_query_openai  - Title: {0} - Base Text: {1} - Song: {2} - Summary: {3} - Questions User: {4}".format(title, base_text, song, summary, qs_user))
-    #langchain.llm_cache = SQLiteCache(database_path="dbs/langchain.db") # Not working
-    #langchain.llm_cache = InMemoryCache()
-    # langchain.llm_cache = GPTCache(init_gptcache)
 
     questions = [f"{i}. {question}" for i, question in enumerate(qs_user, start=1) if question]
     questions_text = "\n".join(questions)
     logger.info("w_query_openai  - Title: {0} - Base Text: {1} - Song: {2} - Summary: {3} - Questions User: {4}".format(title, base_text, song, summary, qs_user))
 
     llm = ChatOpenAI(model_name="gpt-4-turbo")
-    prompt = ChatPromptTemplate.from_messages([ # Make questions modifiable by user input
+    prompt = ChatPromptTemplate.from_messages([
         SystemMessagePromptTemplate.from_template("""
 Eres un asistente que únicamente usa jw.org y las publicaciones de los Testigos de Jehová para mejorar la preparación de reuniones.
 Yo estoy preparándome la Atalaya, edición de estudio, de los Testigos de Jehová.
