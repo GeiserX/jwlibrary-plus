@@ -25,6 +25,8 @@ This project uses a [Docker container](https://hub.docker.com/repository/docker/
 $ docker run --name jwlibrary-plus -e TOKEN=[TOKEN] -e OPENAI_API_KEY=[KEY] drumsergio/jwlibrary-plus
 ```
 
+You will need to initialize the DB with the SQL queries from `extra/create_maindb.sql`
+
 Docker Hub image available at [drumsergio/jwlibrary-plus](https://hub.docker.com/repository/docker/drumsergio/jwlibrary-plus).
 
 ## Usage
