@@ -1,0 +1,15 @@
+services:
+
+  jwlibrary_plus:
+    image: drumsergio/jwlibrary-plus:0.1.40
+    # build: .
+    environment:
+      - TOKEN=YOUR-TOKEN
+      - OPENAI_API_KEY=OPENAI-KEY
+    volumes:
+      - dbs:/app/dbs
+      - userBackups:/app/userBackups
+
+volumes:
+  dbs:
+  userBackups: 
