@@ -209,7 +209,7 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
             cursor.execute("SELECT max(LocationId) FROM Location")
             locationId = cursor.fetchall()[0][0] + 1
             cursor.execute("""INSERT INTO Location (LocationId, DocumentId, IssueTagNumber, KeySymbol, MepsLanguage, Type, Title)
-            VALUES ({0}, {1}, {2}, "w", 1, 0, {3});""".format(locationId, documentId, articleId, title))
+            VALUES (?, ?, ?, "w", 1, 0, ?);""", (locationId, documentId, articleId, title))
         
         cursor.execute("SELECT TagId FROM Tag WHERE Name = 'jwlibrary-plus'")
         tagId = cursor.fetchall()
