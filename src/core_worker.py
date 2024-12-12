@@ -129,7 +129,7 @@ def w_query_openai(title, base_text, song, summary, q_map, qs_user):
     questions_text = "\n".join(questions)
     logger.info("w_query_openai  - Title: {0} - Base Text: {1} - Song: {2} - Summary: {3} - Questions User: {4}".format(title, base_text, song, summary, qs_user))
 
-    llm = ChatOpenAI(model_name="4o-mini")
+    llm = ChatOpenAI(model_name="gpt-4o-mini")
     prompt = ChatPromptTemplate.from_messages([
         SystemMessagePromptTemplate.from_template("""
 Eres un asistente que únicamente usa jw.org y las publicaciones de los Testigos de Jehová para mejorar la preparación de reuniones.

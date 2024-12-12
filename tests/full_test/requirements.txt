@@ -6,4 +6,4 @@ pyrogram==2.0.106
 python-decouple==3.8
 #tgintegration==1.2.0
 git+https://github.com/GeiserX/tgintegration.git
-python-dotenv==1.0.0
+python-dotenv==1.0.1
