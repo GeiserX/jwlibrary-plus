@@ -208,8 +208,8 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
         else:
             cursor.execute("SELECT max(LocationId) FROM Location")
             locationId = cursor.fetchall()[0][0] + 1
-            cursor.execute("""INSERT INTO Location (LocationId, DocumentId, IssueTagNumber, KeySymbol, MepsLanguage, Type)
-            VALUES ({0}, {1}, {2}, "w", 1, 0);""".format(locationId, documentId, articleId))
+            cursor.execute("""INSERT INTO Location (LocationId, DocumentId, IssueTagNumber, KeySymbol, MepsLanguage, Type, Title)
+            VALUES ({0}, {1}, {2}, "w", 1, 0, {3});""".format(locationId, documentId, articleId, title))
         
         cursor.execute("SELECT TagId FROM Tag WHERE Name = 'jwlibrary-plus'")
         tagId = cursor.fetchall()
@@ -258,8 +258,8 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
             Position = 0
 
         for i in notes:
-            uuid_value = str(uuid.uuid4()).upper()
-            uuid_value2 = str(uuid.uuid4()).upper()
+            uuid_value = str(uuid.uuid4()).lower()
+            uuid_value2 = str(uuid.uuid4()).lower()
 
             cursor.execute("""INSERT INTO UserMark ('UserMarkId', 'ColorIndex', 'LocationId', 'StyleIndex', 'UserMarkGuid', 'Version')
             VALUES ('{0}', '2', '{1}', '0', '{2}', '1');""".format(userMarkId, locationId, uuid_value))
