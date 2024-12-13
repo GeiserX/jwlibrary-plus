@@ -7,7 +7,6 @@ import requests
 import gzip
 import shutil
 import pytz
-import locale
 import sqlite3
 import validators
 from urllib.parse import urlparse
@@ -129,10 +128,30 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['conversation_active'] = True
 
     _ = get_translation_function(context)
+    context.user_data['command'] = 'start'  # Indicate that the entry point is /start
+
+    # Send the greeting message
+    if user.is_bot:
+        await update.message.reply_text(_("Los bots no están permitidos"))
+        return ConversationHandler.END
+
+    await update.message.reply_html(_(rf"""😊 ¡Bienvenido! 😊
+
+Este bot le ayudará a mejorar y profundizar en la preparación de <b>La Atalaya</b> usando <b>Inteligencia Artificial</b>. El modelo está personalizado por mí en OpenAI para intentar apegarse lo más posible a la realidad, pero es imposible que todas las respuestas sean correctas y sin alucinaciones.
+
+El bot funciona respondiendo a las preguntas que le dictes. Es decir: si en la pregunta 1, le solicitas que te explique algún punto del párrafo con una ilustración, lo que hará será contestar a la pregunta de el/los párrafo(s) de la Atalaya, e introducirla en el recuadro de texto habilitado para ello.
+
+Más adelante <b>se le sugerirá enviar su archivo de respaldo de .jwlibrary para no perder ninguna información en su dispositivo</b>. Esto es particularmente importante, ya que al restaurar el archivo .jwlibrary que se genera, sus notas y marcas que tenía anteriormente en la aplicación, se perderán. Recomendamos, además, que el artículo de estudio que quiera prepararse esté vacío en su dispositivo, para evitar incongruencias.
+
+Cada vez que ejecute /start , sus preguntas guardadas se <b>borrarán</b> y comenzará con las que el software ofrece por defecto.
+
+Esta aplicación no es oficial ni está afiliada de ningún modo con JW.ORG
+
+Si el bot tardara en responder, espere unos minutos y contacte con @geiserdrums . El bot sirve a cada usuario individualmente de manera secuencial, con lo que quizá lo esté usando otra persona en este mismo instante, sea paciente"""))
 
     if 'language' in context.user_data:
-        # Language is already set; end the conversation
-        return ConversationHandler.END
+        # Language is already set; proceed to the next step
+        return await ask_backup(update, context)
     else:
         # Ask user to select language
         return await language_select(update, context)
@@ -174,8 +193,36 @@ async def language_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     _ = get_translation_function(context)
     await query.edit_message_text(_("Idioma seleccionado: {0}").format(lang_code))
 
-    # Conversation ends here
-    return ConversationHandler.END
+    # Decide what to do next based on the command
+    if context.user_data.get('command') == 'change_language':
+        # End the conversation
+        await query.message.reply_text(_("Idioma cambiado exitosamente."))
+        return ConversationHandler.END
+    elif context.user_data.get('command') == 'start':
+        # Send the greeting message
+        if user.is_bot:
+            await query.message.reply_text(_("Los bots no están permitidos"))
+            return ConversationHandler.END
+
+        await query.message.reply_html(_(rf"""😊 ¡Bienvenido! 😊
+
+Este bot le ayudará a mejorar y profundizar en la preparación de <b>La Atalaya</b> usando <b>Inteligencia Artificial</b>. El modelo está personalizado por mí en OpenAI para intentar apegarse lo más posible a la realidad, pero es imposible que todas las respuestas sean correctas y sin alucinaciones.
+
+El bot funciona respondiendo a las preguntas que le dictes. Es decir: si en la pregunta 1, le solicitas que te explique algún punto del párrafo con una ilustración, lo que hará será contestar a la pregunta de el/los párrafo(s) de la Atalaya, e introducirla en el recuadro de texto habilitado para ello.
+
+Más adelante <b>se le sugerirá enviar su archivo de respaldo de .jwlibrary para no perder ninguna información en su dispositivo</b>. Esto es particularmente importante, ya que al restaurar el archivo .jwlibrary que se genera, sus notas y marcas que tenía anteriormente en la aplicación, se perderán. Recomendamos, además, que el artículo de estudio que quiera prepararse esté vacío en su dispositivo, para evitar incongruencias.
+
+Cada vez que ejecute /start , sus preguntas guardadas se <b>borrarán</b> y comenzará con las que el software ofrece por defecto.
+
+Esta aplicación no es oficial ni está afiliada de ningún modo con JW.ORG
+
+Si el bot tardara en responder, espere unos minutos y contacte con @geiserdrums . El bot sirve a cada usuario individualmente de manera secuencial, con lo que quizá lo esté usando otra persona en este mismo instante, sea paciente"""))
+
+        # Proceed to next step in the conversation
+        return await ask_backup(update, context)
+    else:
+        # Just in case
+        return ConversationHandler.END
 
 async def ask_backup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     _ = get_translation_function(context)
@@ -189,11 +236,13 @@ async def ask_backup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def receive_backup_file_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
     _ = get_translation_function(context)
-    file = await context.bot.get_file(update.message.document)
-    logger.info("RECEIVE_BACKUP_FILE_DOCUMENT - User ID: {0} - File ID: {1} - File Path: {2}".format(user.id, file.file_id, file.file_path))
+    file = update.message.document
+    file_path = file.file_name
+    logger.info("RECEIVE_BACKUP_FILE_DOCUMENT - User ID: {0} - File ID: {1} - File Name: {2}".format(user.id, file.file_id, file_path))
 
-    if(file.file_path.endswith(".jwlibrary")):
+    if file_path.endswith(".jwlibrary"):
         # Save the file
+        file = await context.bot.get_file(file.file_id)
         await file.download_to_drive('userBackups/{0}.jwlibrary'.format(user.id))
         # Run describe_jwlibrary and post output
         try:
@@ -734,11 +783,13 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['conversation_active'] = False
     return ConversationHandler.END
 
-async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
     logger.info("CHANGE_LANGUAGE - User ID: {0}".format(user.id))
-    # Reuse language_select function
-    await language_select(update, context)
+
+    context.user_data['command'] = 'change_language'  # Indicate that the entry point is /change_language
+
+    return await language_select(update, context)
 
 async def admin_broadcast_msg(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
@@ -769,29 +820,66 @@ async def admin_broadcast_msg(update: Update, context: ContextTypes.DEFAULT_TYPE
 def main() -> None:
     application = Application.builder().token(os.environ["TOKEN"]).build()
 
-    # Register global handlers
-    application.add_handler(CommandHandler('change_language', change_language))
-    application.add_handler(CallbackQueryHandler(language_selected, pattern='^lang_'))
-    application.add_handler(CommandHandler('admin_broadcast_msg', admin_broadcast_msg))
-
-    # Define common handlers to allow /cancel from any state
-    common_handlers = [CommandHandler('cancel', cancel)]
-
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
+        entry_points=[CommandHandler('start', start), CommandHandler('change_language', change_language)],
         states={
             LANG_SELECT: [
-                CallbackQueryHandler(language_selected)
-            ] + common_handlers,
-            # Other states remain the same but are not reached in this flow based on your request
+                CallbackQueryHandler(language_selected, pattern='^lang_'),
+                CommandHandler('cancel', cancel),
+            ],
+            RECEIVE_BACKUP_FILE: [
+                MessageHandler(filters.Document.ALL, receive_backup_file_document),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, receive_backup_file_text),
+                CommandHandler('cancel', cancel),
+            ],
+            RECEIVE_DATE_OR_URL_CHOICE: [
+                CallbackQueryHandler(receive_date_or_url_choice),
+                CommandHandler('cancel', cancel),
+            ],
+            RECEIVE_URL: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, receive_url),
+                CommandHandler('cancel', cancel),
+            ],
+            RECEIVE_DATE_SELECTION: [
+                CallbackQueryHandler(receive_date_selection),
+                CommandHandler('cancel', cancel),
+            ],
+            CUSTOMIZE_QUESTIONS_YES_NO: [
+                CallbackQueryHandler(customize_questions_yes_no),
+                CommandHandler('cancel', cancel),
+            ],
+            CHOOSE_EDIT_OR_DELETE: [
+                CallbackQueryHandler(choose_edit_or_delete),
+                CommandHandler('cancel', cancel),
+            ],
+            RECEIVE_QUESTION_NUMBER: [
+                CallbackQueryHandler(receive_question_number),
+                CommandHandler('cancel', cancel),
+            ],
+            RECEIVE_QUESTION_TEXT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, receive_question_text),
+                CommandHandler('cancel', cancel),
+            ],
+            ASK_FOR_MORE_ACTIONS: [
+                CallbackQueryHandler(handle_more_actions_response),
+                CommandHandler('cancel', cancel),
+            ],
+            W_PREPARE: [
+                # If w_prepare doesn't expect user input, you can use a MessageHandler to proceed
+                MessageHandler(filters.ALL, w_prepare),
+                CommandHandler('cancel', cancel),
+            ],
+            AFTER_PREPARATION: [
+                CallbackQueryHandler(after_preparation),
+                CommandHandler('cancel', cancel),
+            ],
         },
         fallbacks=[CommandHandler('cancel', cancel)],
         allow_reentry=True,
     )
 
     application.add_handler(conv_handler)
-
-    # You can add other handlers here if needed
+    application.add_handler(CommandHandler('admin_broadcast_msg', admin_broadcast_msg))
 
     application.run_polling()
 
