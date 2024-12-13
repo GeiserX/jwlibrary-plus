@@ -12,7 +12,7 @@ import sqlite3
 import validators
 from urllib.parse import urlparse
 import sys
-import core_worker
+import core_worker  # Make sure to have your core_worker module available
 from collections import Counter
 import telegram
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -83,6 +83,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     logger.info("START - User ID: {0} - Username: {1}".format(user.id, user.username))
     await check_if_user_exists(update, context)
     
+    # Reset the conversation_active flag
+    context.user_data['conversation_active'] = True
+    
     # Check if LangSelected is set
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
@@ -108,20 +111,19 @@ async def language_select(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     
     keyboard = []
     for name, code in languages:
-        keyboard.append([InlineKeyboardButton(name, callback_data=code)])
+        keyboard.append([InlineKeyboardButton(name, callback_data='lang_' + code)])
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     if update.message:
         await update.message.reply_text('Please select your language / Por favor selecciona tu idioma', reply_markup=reply_markup)
     elif update.callback_query:
         await update.callback_query.edit_message_text('Please select your language / Por favor selecciona tu idioma', reply_markup=reply_markup)
-    return LANG_SELECT
 
-async def language_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def language_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
     user = update.effective_user
-    lang_code = query.data
+    lang_code = query.data.replace('lang_', '')
     logger.info("LANGUAGE_SELECTED - User ID: {0} - Language Code: {1}".format(user.id, lang_code))
     
     context.user_data['language'] = lang_code
@@ -137,12 +139,16 @@ async def language_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     _ = get_translation_function(context)
     await query.edit_message_text(_("Idioma seleccionado: {0}").format(lang_code))
     
-    # Proceed to next step: ask_backup
-    return await ask_backup(update, context)
+    # Optionally, prompt the user to continue
+    await query.message.reply_text(_("Tu idioma ha sido actualizado. Puedes continuar con /start para reiniciar el proceso."))
 
 async def ask_backup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     _ = get_translation_function(context)
-    await update.message.reply_text(_("¿Deseas proporcionar tu archivo de respaldo .jwlibrary? Por favor envíalo ahora. Si prefieres no hacerlo, escribe 'no' u 'omitir'."))
+    context.user_data['conversation_active'] = True  # Set flag indicating conversation is active
+    if update.message:
+        await update.message.reply_text(_("¿Deseas proporcionar tu archivo de respaldo .jwlibrary? Por favor envíalo ahora. Si prefieres no hacerlo, escribe 'no' u 'omitir'."))
+    elif update.callback_query:
+        await update.callback_query.message.reply_text(_("¿Deseas proporcionar tu archivo de respaldo .jwlibrary? Por favor envíalo ahora. Si prefieres no hacerlo, escribe 'no' u 'omitir'."))
     return RECEIVE_BACKUP_FILE
 
 async def receive_backup_file_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -166,6 +172,8 @@ async def receive_backup_file_document(update: Update, context: ContextTypes.DEF
 <u>Última vez modificado:</u> {6}""").format(notesN, tagN, tagMaptN, inputN, bookmarkN, userMarkN, lastModified))
     else:
         await update.message.reply_text(_("Formato de archivo erróneo."))
+        # Ask again
+        return RECEIVE_BACKUP_FILE
     # Proceed to next step
     return await ask_date_or_url(update, context)
 
@@ -287,9 +295,23 @@ async def show_questions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     num_questions = 10
     questions_text = _("<u>Tus preguntas actuales:</u>\n")
+    has_questions = False
     for i in range(num_questions):
         if data[i]:
+            has_questions = True
             questions_text += "{0}. {1}\n".format(i+1, data[i])
+
+    if not has_questions:
+        # Initialize default questions
+        connection = sqlite3.connect("dbs/main.db")
+        cursor = connection.cursor()
+        cursor.execute(
+            "UPDATE Main SET Q1 = ?, Q2 = ?, Q3 = ? WHERE UserId = ?",
+            (init_questions[0], init_questions[1], init_questions[2], user.id)
+        )
+        connection.commit()
+        connection.close()
+        questions_text += "\n".join(f"{i+1}. {q}" for i, q in enumerate(init_questions))
 
     keyboard = [
         [InlineKeyboardButton(_("Sí"), callback_data='yes')],
@@ -326,7 +348,10 @@ async def ask_for_question_edit(update: Update, context: ContextTypes.DEFAULT_TY
     for i in range(1, 11):
         keyboard.append([InlineKeyboardButton(f"Q{i}", callback_data=str(i))])
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(_("Por favor, selecciona el número de la pregunta que deseas editar:"), reply_markup=reply_markup)
+    if update.message:
+        await update.message.reply_text(_("Por favor, selecciona el número de la pregunta que deseas editar:"), reply_markup=reply_markup)
+    elif update.callback_query:
+        await update.callback_query.message.reply_text(_("Por favor, selecciona el número de la pregunta que deseas editar:"), reply_markup=reply_markup)
     return RECEIVE_QUESTION_NUMBER
 
 async def receive_question_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -385,11 +410,8 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         message = update.callback_query.message
         await message.reply_text(_("Comenzando la preparación. Por favor, espera..."))
         await context.bot.send_chat_action(chat_id=message.chat_id, action=telegram.constants.ChatAction.TYPING)
- 
-    # Call core_worker.main with appropriate parameters
     # Extract data from context.user_data and possibly from database
     # For example, get qs (questions), date/url, etc.
-    # Then, proceed as in your original w_prepare function
 
     # Fetch necessary data from the database
     connection = sqlite3.connect("dbs/main.db")
@@ -427,47 +449,133 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     if any(qs):
         if (url is not None) and (date is not None):
-            await update.message.reply_text(_("Tienes guardados una fecha y una URL. Se está tomando la fecha como valor predeterminado. Si quieres usar la URL, borra la fecha con /date_delete"))
+            if update.message:
+                await update.message.reply_text(_("Tienes guardados una fecha y una URL. Se está tomando la fecha como valor predeterminado. Si quieres usar la URL, borra la fecha con /date_delete"))
+            elif update.callback_query:
+                await update.callback_query.message.reply_text(_("Tienes guardados una fecha y una URL. Se está tomando la fecha como valor predeterminado. Si quieres usar la URL, borra la fecha con /date_delete"))
         if date is not None:
             # Logic to fetch URL based on date
-            # Similar to your original w_prepare function
-            await update.message.reply_text(_("Obteniendo el URL basado en la fecha seleccionada. Por favor, espera..."))
-            # Implement the logic to get the URL from the date
-            # Save the URL in the database and set url variable
-            # For this example, we'll assume you have a function get_url_from_date
+            if url is None:
+                if update.message:
+                    await update.message.reply_text(_("Obteniendo el URL basado en la fecha seleccionada. Por favor, espera..."))
+                elif update.callback_query:
+                    await update.callback_query.message.reply_text(_("Obteniendo el URL basado en la fecha seleccionada. Por favor, espera..."))
+                # Implement the logic to get the URL from the date
+                # Fetch the URL based on date and language
+                # --- Begin logic to fetch URL based on date ---
+                try:
+                    now = datetime.now(pytz.timezone('Europe/Madrid'))
+                    start_date = now - timedelta(days=now.weekday()) + timedelta(int(date)*7)
+                    dates = []
+                    for i in range(5):
+                        dates.append((start_date - timedelta(7*i)).strftime("%Y-%m-%d"))
 
-            # TODO: Implement get_url_from_date function
-            # url = get_url_from_date(date, langSelected)
-            # For the sake of example, let's just log that we would fetch the URL
-            # Simulate fetching the URL based on date
-            url = "https://www.jw.org/fake-url-based-on-date"
-            # Save URL to database
-            connection = sqlite3.connect("dbs/main.db")
-            cursor = connection.cursor()
-            cursor.execute("UPDATE Main SET Url = ? WHERE UserId = ?", (url, user.id))
-            connection.commit()
-            connection.close()
-            await update.message.reply_text(_("URL obtenido a partir de la fecha seleccionada."))
+                    jsonurl = requests.get("https://app.jw-cdn.org/catalogs/publications/v4/manifest.json")
+                    manifest_id = jsonurl.json()['current']
+                    catalog = requests.get("https://app.jw-cdn.org/catalogs/publications/v4/" + manifest_id + "/catalog.db.gz")
+                    open('catalog.db.gz', 'wb').write(catalog.content)
+                    with gzip.open("catalog.db.gz", "rb") as f:
+                        with open('dbs/catalog.db', 'wb') as f_out:
+                            shutil.copyfileobj(f, f_out)
+                    os.remove("catalog.db.gz")
+                    connection = sqlite3.connect("dbs/catalog.db")
+                    cursor = connection.cursor()
+                    cursor.execute("SELECT * FROM DatedText WHERE Class = 68 AND (Start = ? OR Start = ? OR Start = ? OR Start = ? OR Start = ?)", (dates[0], dates[1], dates[2], dates[3], dates[4]))
+                    dates_catalog = cursor.fetchall()
+
+                    list_of_dates = [datetime.strptime(x[1],"%Y-%m-%d") for x in dates_catalog]
+                    date_count = Counter(list_of_dates)
+                    selected_dates = [date for date in list_of_dates if date_count[date] > 100]
+
+                    if not selected_dates:
+                        raise ValueError("No dates found in catalog")
+
+                    newest_date = max(selected_dates).strftime("%Y-%m-%d")
+                    delta_start_week_found = dates.index(newest_date)
+                    possiblePubId = [str(x[3]) for x in dates_catalog if x[1] == newest_date]
+
+                    cursor.execute("SELECT PublicationRootKeyId, IssueTagNumber, Symbol, Title, IssueTitle, Year, Id FROM Publication WHERE MepsLanguageId = 1 AND Id IN ({0})".format(', '.join(possiblePubId)))
+                    publication = cursor.fetchall()
+                    cursor.close()
+
+                    lang = "S"  # For Spanish; adjust according to langSelected
+                    if langSelected == 'es':
+                        lang = 'S'
+                    elif langSelected == 'en':
+                        lang = 'E'
+                    # Add other language codes as needed
+
+                    year = publication[0][5]
+                    symbol = publication[0][2]
+                    month = str(publication[0][1])[4:6]
+                    magazine = requests.get(f"https://www.jw.org/finder?wtlocale={lang}&issue={year}-{month}&pub={symbol}").text
+                    soup = BeautifulSoup(magazine, features="html.parser")
+                    div_study_articles = soup.find_all("div", {"class":"docClass-40"})
+
+                    url = "https://www.jw.org" + div_study_articles[delta_start_week_found].find("a").get("href")
+                    # Save URL to database
+                    connection = sqlite3.connect("dbs/main.db")
+                    cursor = connection.cursor()
+                    cursor.execute("UPDATE Main SET Url = ? WHERE UserId = ?", (url, user.id))
+                    connection.commit()
+                    connection.close()
+                    if update.message:
+                        await update.message.reply_text(_("URL obtenido a partir de la fecha seleccionada."))
+                    elif update.callback_query:
+                        await update.callback_query.message.reply_text(_("URL obtenido a partir de la fecha seleccionada."))
+                except Exception as e:
+                    logger.error("Error fetching URL based on date: %s", e)
+                    if update.message:
+                        await update.message.reply_text(_("No se pudo obtener el URL basado en la fecha seleccionada."))
+                    elif update.callback_query:
+                        await update.callback_query.message.reply_text(_("No se pudo obtener el URL basado en la fecha seleccionada."))
+                    return ConversationHandler.END
+                # --- End logic to fetch URL based on date ---
 
         if (url is not None):
-            await update.message.reply_text(_("Comenzando peticiones a ChatGPT. Podría tardar incluso más de 10 minutos dependiendo del número de preguntas que hayas configurado."))
-            filenamejw, filenamedoc, filenamepdf = core_worker.main(url, user.id, qs)
-            if(os.path.isfile('userBackups/{0}.jwlibrary'.format(user.id))):
-                await update.message.reply_text(_("Aquí tienes tu fichero, impórtalo en JW Library. Recuerda hacer una copia de seguridad para no perder los datos, ya que proporcionaste tu archivo .jwlibrary"))
-            else:
-                await update.message.reply_text(_("Aquí tienes tu fichero, impórtalo en JW Library. Al no haber proporcionado tu copia de seguridad, hazlo con precaución."))
-            await update.message.reply_document(document=open(filenamejw, "rb"))
-            os.remove(filenamejw)
+            if update.message:
+                await update.message.reply_text(_("Comenzando peticiones a ChatGPT. Podría tardar incluso más de 10 minutos dependiendo del número de preguntas que hayas configurado."))
+            elif update.callback_query:
+                await update.callback_query.message.reply_text(_("Comenzando peticiones a ChatGPT. Podría tardar incluso más de 10 minutos dependiendo del número de preguntas que hayas configurado."))
+            try:
+                filenamejw, filenamedoc, filenamepdf = core_worker.main(url, user.id, qs)
+                if(os.path.isfile('userBackups/{0}.jwlibrary'.format(user.id))):
+                    if update.message:
+                        await update.message.reply_text(_("Aquí tienes tu fichero, impórtalo en JW Library. Recuerda hacer una copia de seguridad para no perder los datos, ya que proporcionaste tu archivo .jwlibrary"))
+                    elif update.callback_query:
+                        await update.callback_query.message.reply_text(_("Aquí tienes tu fichero, impórtalo en JW Library. Recuerda hacer una copia de seguridad para no perder los datos, ya que proporcionaste tu archivo .jwlibrary"))
+                else:
+                    if update.message:
+                        await update.message.reply_text(_("Aquí tienes tu fichero, impórtalo en JW Library. Al no haber proporcionado tu copia de seguridad, hazlo con precaución."))
+                    elif update.callback_query:
+                        await update.callback_query.message.reply_text(_("Aquí tienes tu fichero, impórtalo en JW Library. Al no haber proporcionado tu copia de seguridad, hazlo con precaución."))
+                await update.message.reply_document(document=open(filenamejw, "rb"))
+                os.remove(filenamejw)
 
-            await update.message.reply_text(_("Aquí también encontrarás los archivos en formato Word y PDF"))
-            await update.message.reply_document(document=open(filenamedoc, "rb"))
-            await update.message.reply_document(document=open(filenamepdf, "rb"))
-            os.remove(filenamedoc)
-            os.remove(filenamepdf)
+                await update.message.reply_text(_("Aquí también encontrarás los archivos en formato Word y PDF"))
+                await update.message.reply_document(document=open(filenamedoc, "rb"))
+                await update.message.reply_document(document=open(filenamepdf, "rb"))
+                os.remove(filenamedoc)
+                os.remove(filenamepdf)
+            except Exception as e:
+                logger.error("Error in core_worker.main: %s", e)
+                if update.message:
+                    await update.message.reply_text(_("Ocurrió un error al preparar los archivos. Por favor, inténtalo de nuevo más tarde."))
+                elif update.callback_query:
+                    await update.callback_query.message.reply_text(_("Ocurrió un error al preparar los archivos. Por favor, inténtalo de nuevo más tarde."))
+                return ConversationHandler.END
         else:
-            await update.message.reply_text(_("No has seleccionado ninguna fecha o URL"))
+            if update.message:
+                await update.message.reply_text(_("No has seleccionado ninguna fecha o URL"))
+            elif update.callback_query:
+                await update.callback_query.message.reply_text(_("No has seleccionado ninguna fecha o URL"))
+            return ConversationHandler.END
     else:
-        await update.message.reply_text(_("Todas las preguntas están vacías"))
+        if update.message:
+            await update.message.reply_text(_("Todas las preguntas están vacías"))
+        elif update.callback_query:
+            await update.callback_query.message.reply_text(_("Todas las preguntas están vacías"))
+        return ConversationHandler.END
 
     # After preparation, ask the user if they want to prepare another article
     keyboard = [
@@ -475,7 +583,10 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         [InlineKeyboardButton(_("No"), callback_data='no')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(_("¿Deseas preparar con otras preguntas u otro artículo de La Atalaya?\nNota: Las preguntas ahora se eliminan."), reply_markup=reply_markup)
+    if update.message:
+        await update.message.reply_text(_("¿Deseas preparar con otras preguntas u otro artículo de La Atalaya?\nNota: Las preguntas ahora se eliminan."), reply_markup=reply_markup)
+    elif update.callback_query:
+        await update.callback_query.message.reply_text(_("¿Deseas preparar con otras preguntas u otro artículo de La Atalaya?\nNota: Las preguntas ahora se eliminan."), reply_markup=reply_markup)
     return AFTER_PREPARATION
 
 async def after_preparation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -500,6 +611,8 @@ async def after_preparation(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         return await ask_backup(update, context)
     else:
         await query.edit_message_text(_("Las preguntas ahora están eliminadas. Para ejecutar el bot nuevamente, por favor escribe /start"))
+        # Conversation ends
+        context.user_data['conversation_active'] = False
         return ConversationHandler.END
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -507,19 +620,24 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     logger.info("User %s canceled the conversation.", user.first_name)
     _ = get_translation_function(context)
     await update.message.reply_text(_("Operación cancelada."))
+    # Conversation ends
+    context.user_data['conversation_active'] = False
     return ConversationHandler.END
 
-async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info("CHANGE_LANGUAGE - User ID: {0}".format(user.id))
-    # Reuse language_select function
-    return await language_select(update, context)
+    await language_select(update, context)  # Call the language selection function
 
 def main() -> None:
     application = Application.builder().token(os.environ["TOKEN"]).build()
 
-    # Define common handlers to allow /change_language from any state
-    common_handlers = [CommandHandler('change_language', change_language), CommandHandler('cancel', cancel)]
+    # Register global handlers
+    application.add_handler(CommandHandler('change_language', change_language))
+    application.add_handler(CallbackQueryHandler(language_selected, pattern='^lang_'))
+
+    # Define common handlers to allow /cancel from any state
+    common_handlers = [CommandHandler('cancel', cancel)]
 
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
