@@ -89,6 +89,7 @@ def w_extract_html(url, get_all):
         p_elements = soup.find("div", {"class":"bodyTxt"})
         questions = p_elements.find_all("p", {"class": lambda x: x and x.startswith("qu")})
         paragraphs = p_elements.find_all("p", {"class": lambda x: x and x.startswith("p")})
+        textareas = soup.find_all("textarea")
 
         # Example q_map = {0 : [q1, [p1]], 1 : [q2&3, [p2, p3]]}
         q_map = {}
@@ -98,7 +99,7 @@ def w_extract_html(url, get_all):
             q_map[i].append([p for p in paragraphs if p.has_attr('data-rel-pid') if p.get('data-rel-pid').strip('[]') in q.get('data-pid')])
             i = i+1
         
-        return title, base_text, song, summary, questions, documentId, articleId, q_map
+        return title, base_text, song, summary, questions, documentId, articleId, q_map, textareas
     else:
         return title, articleId, articleN
     
@@ -166,7 +167,7 @@ No escribas estas preguntas de nuevo en la respuesta. Separa las respuestas con 
 ### WRITE JWLIBRARY FILE ###
 ############################
 
-def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_user):
+def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_user, textareas):
 
     logger.info("write_jwlibrary - Document ID: {0} - Article ID: {1} - Title: {2} - Questions: {3} - Notes: {4} - Telegram User: {5}".format(documentId, articleId, title, questions, notes, telegram_user))
     uploadedJwLibrary = 'userBackups/{0}.jwlibrary'.format(telegram_user)
@@ -258,7 +259,7 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
         #     Position = 0
 
         for i in notes:
-            cursor.execute("""INSERT INTO InputField ('LocationId', 'TextTag', 'Value') VALUES ('{0}', 'tt{1}', '{2}')""".format(locationId, questions[i].get("data-pid")+1, questions[i].text))
+            cursor.execute("""INSERT INTO InputField ('LocationId', 'TextTag', 'Value') VALUES ('{0}', '{1}', '{2}')""".format(locationId, textareas[i].get("id"), notes[i].replace("'", '"')))
 
             # uuid_value = str(uuid.uuid4()).lower()
             # uuid_value2 = str(uuid.uuid4()).lower()
@@ -315,7 +316,7 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
         #cursor.execute("INSERT INTO Tag ('TagId', 'Type', 'Name') VALUES ('2', '1', 'jwlibrary-plus')")
 
         for i in notes:
-            cursor.execute("""INSERT INTO InputField ('LocationId', 'TextTag', 'Value') VALUES ('{0}', 'tt{1}', '{2}')""".format(locationId, questions[i].get("data-pid")+1, questions[i].text))
+            cursor.execute("""INSERT INTO InputField ('LocationId', 'TextTag', 'Value') VALUES (1, '{0}', '{1}')""".format(textareas[i].get("id"), notes[i].replace("'", '"')))
 
             # uuid_value = str(uuid.uuid4()).upper()
             # uuid_value2 = str(uuid.uuid4()).upper()
@@ -374,9 +375,9 @@ def write_docx_pdf(documentId, title, questions, notes, telegram_user):
 
 def main(url, telegram_user, qs_user) -> None:
 
-    title, base_text, song, summary, questions, documentId, articleId, q_map = w_extract_html(url, get_all=True)
+    title, base_text, song, summary, questions, documentId, articleId, q_map, textareas = w_extract_html(url, get_all=True)
     notes = w_query_openai(title, base_text, song, summary, q_map, qs_user)
-    filenamejw = write_jwlibrary(documentId, articleId, title, questions, notes, telegram_user)
+    filenamejw = write_jwlibrary(documentId, articleId, title, questions, notes, telegram_user, textareas)
     filenamedoc, filenamepdf = write_docx_pdf(documentId, title, questions, notes, telegram_user)
     return filenamejw, filenamedoc, filenamepdf
 
