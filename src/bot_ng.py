@@ -30,10 +30,10 @@ from telegram.error import Forbidden
     RECEIVE_URL,
     RECEIVE_DATE_SELECTION,
     CUSTOMIZE_QUESTIONS_YES_NO,
-    CHOOSE_EDIT_OR_DELETE,      # New state added
+    CHOOSE_EDIT_OR_DELETE,
     RECEIVE_QUESTION_NUMBER,
     RECEIVE_QUESTION_TEXT,
-    ASK_FOR_MORE_ACTIONS,       # Renamed for clarity
+    ASK_FOR_MORE_ACTIONS,
     W_PREPARE,
     AFTER_PREPARATION
 ) = range(12)
@@ -81,23 +81,56 @@ async def check_if_user_exists(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
-    logger.info("START - User ID: {0} - Username: {1}".format(user.id, user.username))
     await check_if_user_exists(update, context)
-    
+
+    # Check LastRun timestamp unless user is admin
+    if user.id != 835003:  # Admin user ID
+        connection = sqlite3.connect("dbs/main.db")
+        cursor = connection.cursor()
+        cursor.execute("SELECT LastRun, LangSelected FROM Main WHERE UserId = ?", (user.id,))
+        result = cursor.fetchone()
+        connection.close()
+
+        last_run_str = result[0] if result else None
+        lang_selected = result[1] if result else None
+
+        # Set the user's selected language in context
+        if lang_selected:
+            context.user_data['language'] = lang_selected
+
+        _ = get_translation_function(context)
+
+        now = datetime.now(pytz.timezone('Europe/Madrid'))
+        if last_run_str:
+            last_run = datetime.fromisoformat(last_run_str)
+            time_since_last_run = now - last_run
+            if time_since_last_run < timedelta(hours=8):
+                remaining_time = timedelta(hours=8) - time_since_last_run
+                hours, remainder = divmod(remaining_time.seconds, 3600)
+                minutes, _ = divmod(remainder, 60)
+                await update.message.reply_text(
+                    _("Por favor, inténtelo de nuevo dentro de {} horas y {} minutos. Así puedo controlar mejor los gastos, ya que es gratuito. Si tiene algún problema, contacte con @geiserdrums").format(hours, minutes)
+                )
+                return ConversationHandler.END  # End the conversation
+    else:
+        # Admin user bypasses the last run check
+        connection = sqlite3.connect("dbs/main.db")
+        cursor = connection.cursor()
+        cursor.execute("SELECT LangSelected FROM Main WHERE UserId = ?", (user.id,))
+        result = cursor.fetchone()
+        connection.close()
+        lang_selected = result[0] if result else None
+        if lang_selected:
+            context.user_data['language'] = lang_selected
+
+    # Proceed as usual
+    logger.info("START - User ID: {0} - Username: {1}".format(user.id, user.username))
     # Reset the conversation_active flag
     context.user_data['conversation_active'] = True
-    
-    # Check if LangSelected is set
-    connection = sqlite3.connect("dbs/main.db")
-    cursor = connection.cursor()
-    cursor.execute("SELECT LangSelected FROM Main WHERE UserId = ?", (user.id,))
-    result = cursor.fetchone()
-    connection.close()
-    
-    if result and result[0]:
-        # User has selected language previously
-        # Set the user's selected language in context
-        context.user_data['language'] = result[0]
+
+    _ = get_translation_function(context)
+
+    if 'language' in context.user_data:
         # Proceed to next step
         return await ask_backup(update, context)
     else:
@@ -107,42 +140,42 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def language_select(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
     logger.info("LANGUAGE_SELECT - User ID: {0}".format(user.id))
-    
+
     languages = [("English", "en"), ("Español", "es"), ("Français", "fr"), ("Português", "pt"), ("Deutsch", "de"), ("Български", "bg")]
-    
+
     keyboard = []
     for name, code in languages:
         keyboard.append([InlineKeyboardButton(name, callback_data='lang_' + code)])
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
+
     if update.message:
         await update.message.reply_text('Please select your language / Por favor selecciona tu idioma', reply_markup=reply_markup)
     elif update.callback_query:
         await update.callback_query.edit_message_text('Please select your language / Por favor selecciona tu idioma', reply_markup=reply_markup)
-    return ConversationHandler.END  # End conversation here if called from /change_language
+    return LANG_SELECT
 
-async def language_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def language_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
     user = update.effective_user
     lang_code = query.data.replace('lang_', '')
     logger.info("LANGUAGE_SELECTED - User ID: {0} - Language Code: {1}".format(user.id, lang_code))
-    
+
     context.user_data['language'] = lang_code
-    
+
     # Save to database
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
     cursor.execute("UPDATE Main SET LangSelected = ? WHERE UserId = ?", (lang_code, user.id))
     connection.commit()
     connection.close()
-    
+
     # Acknowledge the selection
     _ = get_translation_function(context)
     await query.edit_message_text(_("Idioma seleccionado: {0}").format(lang_code))
-    
-    # Optionally, inform the user to continue
-    await query.message.reply_text(_("Tu idioma ha sido actualizado. Puedes continuar con /start para reiniciar el proceso."))
+
+    # Proceed to next step
+    return await ask_backup(update, context)
 
 async def ask_backup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     _ = get_translation_function(context)
@@ -158,7 +191,7 @@ async def receive_backup_file_document(update: Update, context: ContextTypes.DEF
     _ = get_translation_function(context)
     file = await context.bot.get_file(update.message.document)
     logger.info("RECEIVE_BACKUP_FILE_DOCUMENT - User ID: {0} - File ID: {1} - File Path: {2}".format(user.id, file.file_id, file.file_path))
-    
+
     if(file.file_path.endswith(".jwlibrary")):
         # Save the file
         await file.download_to_drive('userBackups/{0}.jwlibrary'.format(user.id))
@@ -207,7 +240,7 @@ async def ask_date_or_url(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if update.message:
         await update.message.reply_text(_("¿Deseas seleccionar una fecha o proporcionar una URL específica?"), reply_markup=reply_markup)
     elif update.callback_query:
-        await update.callback_query.edit_message_text(_("¿Deseas seleccionar una fecha o proporcionar una URL específica?"), reply_markup=reply_markup)
+        await update.callback_query.message.reply_text(_("¿Deseas seleccionar una fecha o proporcionar una URL específica?"), reply_markup=reply_markup)
     return RECEIVE_DATE_OR_URL_CHOICE
 
 async def receive_date_or_url_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -349,7 +382,6 @@ async def customize_questions_yes_no(update: Update, context: ContextTypes.DEFAU
         # Proceed to preparation
         return await w_prepare(update, context)
 
-# New function to ask whether to edit or delete questions
 async def ask_edit_or_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     _ = get_translation_function(context)
     # Ask user if they want to edit or delete questions
@@ -361,7 +393,6 @@ async def ask_edit_or_delete(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await update.callback_query.message.reply_text(_("¿Deseas editar o eliminar preguntas?"), reply_markup=reply_markup)
     return CHOOSE_EDIT_OR_DELETE
 
-# Function to handle the choice between edit or delete
 async def choose_edit_or_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
@@ -372,7 +403,6 @@ async def choose_edit_or_delete(update: Update, context: ContextTypes.DEFAULT_TY
     # Proceed to select question to edit or delete
     return await ask_for_question_number(update, context)
 
-# Function to ask for the question number to edit or delete
 async def ask_for_question_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     _ = get_translation_function(context)
     action = context.user_data['action']  # 'edit' or 'delete'
@@ -398,7 +428,6 @@ async def ask_for_question_number(update: Update, context: ContextTypes.DEFAULT_
     await update.callback_query.message.reply_text(text, reply_markup=reply_markup)
     return RECEIVE_QUESTION_NUMBER
 
-# Modified receive_question_number function to handle edit or delete
 async def receive_question_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
@@ -449,7 +478,6 @@ async def receive_question_text(update: Update, context: ContextTypes.DEFAULT_TY
     # Ask if user wants to perform another action
     return await ask_for_more_actions(update, context)
 
-# Function to ask if the user wants to perform more actions
 async def ask_for_more_actions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     _ = get_translation_function(context)
     keyboard = [
@@ -463,7 +491,6 @@ async def ask_for_more_actions(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.callback_query.message.reply_text(_("¿Deseas realizar otra acción sobre las preguntas?"), reply_markup=reply_markup)
     return ASK_FOR_MORE_ACTIONS
 
-# Function to handle the user's response about more actions
 async def handle_more_actions_response(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
@@ -477,7 +504,6 @@ async def handle_more_actions_response(update: Update, context: ContextTypes.DEF
         # Proceed to preparation
         return await w_prepare(update, context)
 
-# The w_prepare function remains the same as in your current script
 async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
     _ = get_translation_function(context)
@@ -655,6 +681,31 @@ async def after_preparation(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     user = update.effective_user
     logger.info("AFTER_PREPARATION - User ID: {0} - Choice: {1}".format(user.id, user_choice))
     _ = get_translation_function(context)
+
+    now = datetime.now(pytz.timezone('Europe/Madrid'))
+
+    # Check LastRun timestamp unless user is admin
+    if user.id != 835003:
+        connection = sqlite3.connect("dbs/main.db")
+        cursor = connection.cursor()
+        cursor.execute("SELECT LastRun FROM Main WHERE UserId = ?", (user.id,))
+        last_run_str = cursor.fetchone()[0]
+        connection.close()
+
+        if last_run_str:
+            last_run = datetime.fromisoformat(last_run_str)
+            time_since_last_run = now - last_run
+            if time_since_last_run < timedelta(hours=8):
+                remaining_time = timedelta(hours=8) - time_since_last_run
+                hours, remainder = divmod(remaining_time.seconds, 3600)
+                minutes, _ = divmod(remainder, 60)
+                await query.message.reply_text(
+                    _("Por favor, inténtelo de nuevo dentro de {} horas y {} minutos. Así puedo controlar mejor los gastos, ya que es gratuito. Si tiene algún problema, contacte con @geiserdrums").format(hours, minutes)
+                )
+                # Conversation ends
+                context.user_data['conversation_active'] = False
+                return ConversationHandler.END
+
     # Delete questions in database
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
@@ -665,13 +716,11 @@ async def after_preparation(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     connection.commit()
     connection.close()
 
-    message = query.message
-
     if user_choice == 'yes':
-        await message.reply_text(_("Comenzando de nuevo..."))
+        await query.message.reply_text(_("Comenzando de nuevo..."))
         return await ask_backup(update, context)
     else:
-        await message.reply_text(_("Las preguntas ahora están eliminadas. Para ejecutar el bot nuevamente, por favor escribe /start"))
+        await query.message.reply_text(_("Las preguntas ahora están eliminadas. Para ejecutar el bot nuevamente, por favor escribe /start"))
         # Conversation ends
         context.user_data['conversation_active'] = False
         return ConversationHandler.END
@@ -691,12 +740,39 @@ async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     # Reuse language_select function
     await language_select(update, context)
 
+async def admin_broadcast_msg(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    if user.id == 835003:  # Admin user ID
+        message_text = update.message.text.partition(' ')[2]  # Get text after command
+        if not message_text:
+            await update.message.reply_text("Por favor, proporciona un mensaje para enviar a todos los usuarios.")
+            return
+        # Fetch all user IDs from the database
+        connection = sqlite3.connect("dbs/main.db")
+        cursor = connection.cursor()
+        cursor.execute("SELECT UserId FROM Main")
+        user_ids = cursor.fetchall()
+        connection.close()
+        # Send the message to all users
+        success_count = 0
+        for user_id_tuple in user_ids:
+            user_id = user_id_tuple[0]
+            try:
+                await context.bot.send_message(chat_id=user_id, text=message_text)
+                success_count +=1
+            except Exception as e:
+                logger.error(f"Failed to send message to {user_id}: {e}")
+        await update.message.reply_text(f"Mensaje enviado a {success_count} usuarios.")
+    else:
+        await update.message.reply_text("No tienes permiso para usar este comando.")
+
 def main() -> None:
     application = Application.builder().token(os.environ["TOKEN"]).build()
 
     # Register global handlers
     application.add_handler(CommandHandler('change_language', change_language))
     application.add_handler(CallbackQueryHandler(language_selected, pattern='^lang_'))
+    application.add_handler(CommandHandler('admin_broadcast_msg', admin_broadcast_msg))
 
     # Define common handlers to allow /cancel from any state
     common_handlers = [CommandHandler('cancel', cancel)]
@@ -704,6 +780,9 @@ def main() -> None:
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
+            LANG_SELECT: [
+                CallbackQueryHandler(language_selected)
+            ] + common_handlers,
             RECEIVE_BACKUP_FILE: [
                 MessageHandler(filters.Document.ALL, receive_backup_file_document),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, receive_backup_file_text),
