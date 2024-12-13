@@ -156,7 +156,7 @@ No escribas estas preguntas de nuevo en la respuesta. Separa las respuestas con 
         notes[i] = conversation.predict(input="Pregunta: {0} -- Párrafo(s): {1}".format(q[0].text, flattened_paragraph))
         logger.debug("Called predict() method, result: {0}".format(notes[i]))
 
-        logger.info("w_query_openai(Note) - Note: {0}".format(notes[i])) # TODO: Reduce logs in the future when everything works stable
+        logger.info("w_query_openai(Note) - Note: {0}".format(notes[i])) # TODO: Reduce logs in the future when everything stabilizes
         i=i+1
     
     return notes
@@ -181,7 +181,7 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
     now_utc_iso = now_utc.isoformat("T", "seconds").replace('+00:00', 'Z')
     schema_version = 14 # TODO: Upgrade when needed
 
-    j = '{{"name":"jwlibrary-plus-backup_{0}","creationDate":"{1}","version":1,"type":0,"userDataBackup":{{"lastModifiedDate":"{2}","deviceName":"jwlibrary-plus","databaseName":"userData.db","schemaVersion":{3}}}}}'.format(now_date, now_date, now_iso, schema_version)
+    j = '{{"name":"jwlibrary-plus-backup_{0}","creationDate":"{1}","version":1,"type":0,"userDataBackup":{{"lastModifiedDate":"{2}","deviceName":"jwlibraryPlus","databaseName":"userData.db","schemaVersion":{3}}}}}'.format(now_date, now_date, now_iso, schema_version)
     manifest = json.loads(j)
 
     thumbnail_file = "extra/default_thumbnail.png"
@@ -208,75 +208,76 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
         else:
             cursor.execute("SELECT max(LocationId) FROM Location")
             locationId = cursor.fetchall()[0][0] + 1
-            cursor.execute("""INSERT INTO Location (LocationId, DocumentId, IssueTagNumber, KeySymbol, MepsLanguage, Type, Title)
-            VALUES (?, ?, ?, "w", 1, 0, ?);""", (locationId, documentId, articleId, title))
+            cursor.execute("""INSERT INTO Location (LocationId, DocumentId, IssueTagNumber, KeySymbol, Type)
+            VALUES (?, ?, ?, "w", 0);""", (locationId, documentId, articleId))
         
-        cursor.execute("SELECT TagId FROM Tag WHERE Name = 'jwlibrary-plus'")
-        tagId = cursor.fetchall()
-        if not tagId:
-            cursor.execute("SELECT max(TagId) FROM Tag") # There will be always some tag, even on a brand-new install
-            tagId = cursor.fetchall()[0][0] + 1
-            cursor.execute("INSERT INTO Tag ('TagId', 'Type', 'Name') VALUES ('{0}', '1', 'jwlibrary-plus')".format(tagId))
-            tagId +=1
-        else:
-            tagId = tagId[0][0]
+        # cursor.execute("SELECT TagId FROM Tag WHERE Name = 'jwlibrary-plus'")
+        # tagId = cursor.fetchall()
+        # if not tagId:
+        #     cursor.execute("SELECT max(TagId) FROM Tag") # There will be always some tag, even on a brand-new install
+        #     tagId = cursor.fetchall()[0][0] + 1
+        #     cursor.execute("INSERT INTO Tag ('TagId', 'Type', 'Name') VALUES ('{0}', '1', 'jwlibrary-plus')".format(tagId))
+        #     tagId +=1
+        # else:
+        #     tagId = tagId[0][0]
  
 
-        cursor.execute("SELECT * FROM UserMark LIMIT 1")
-        nonEmptyUserMark = cursor.fetchall()
-        if nonEmptyUserMark:
-            cursor.execute("SELECT max(UserMarkId) FROM UserMark")
-            userMarkId = cursor.fetchall()[0][0] + 1
-        else:
-            userMarkId = 1
+        # cursor.execute("SELECT * FROM UserMark LIMIT 1")
+        # nonEmptyUserMark = cursor.fetchall()
+        # if nonEmptyUserMark:
+        #     cursor.execute("SELECT max(UserMarkId) FROM UserMark")
+        #     userMarkId = cursor.fetchall()[0][0] + 1
+        # else:
+        #     userMarkId = 1
 
-        cursor.execute("SELECT BlockRangeId FROM BlockRange LIMIT 1")
-        nonEmptyBlockRangeId = cursor.fetchall()
-        if nonEmptyBlockRangeId:
-            cursor.execute("SELECT max(BlockRangeId) FROM BlockRange")
-            blockRangeId = cursor.fetchall()[0][0] + 1
-        else:
-            blockRangeId = 1
+        # cursor.execute("SELECT BlockRangeId FROM BlockRange LIMIT 1")
+        # nonEmptyBlockRangeId = cursor.fetchall()
+        # if nonEmptyBlockRangeId:
+        #     cursor.execute("SELECT max(BlockRangeId) FROM BlockRange")
+        #     blockRangeId = cursor.fetchall()[0][0] + 1
+        # else:
+        #     blockRangeId = 1
 
-        cursor.execute("SELECT * FROM Note LIMIT 1")
-        nonEmptyNote = cursor.fetchall()
-        if nonEmptyNote:
-            cursor.execute("SELECT max(NoteId) FROM Note")
-            noteId = cursor.fetchall()[0][0] + 1
-        else:
-            noteId = 1
+        # cursor.execute("SELECT * FROM Note LIMIT 1")
+        # nonEmptyNote = cursor.fetchall()
+        # if nonEmptyNote:
+        #     cursor.execute("SELECT max(NoteId) FROM Note")
+        #     noteId = cursor.fetchall()[0][0] + 1
+        # else:
+        #     noteId = 1
 
-        cursor.execute("SELECT * FROM TagMap LIMIT 1")
-        nonEmptyTagMap = cursor.fetchall()
-        if nonEmptyTagMap:
-            cursor.execute("SELECT max(TagMapId) FROM TagMap")
-            tagMapId = cursor.fetchall()[0][0] + 1
-            cursor.execute("SELECT max(Position) FROM TagMap")
-            Position = cursor.fetchall()[0][0] + 1
-        else:
-            tagMapId = 1
-            Position = 0
+        # cursor.execute("SELECT * FROM TagMap LIMIT 1")
+        # nonEmptyTagMap = cursor.fetchall()
+        # if nonEmptyTagMap:
+        #     cursor.execute("SELECT max(TagMapId) FROM TagMap")
+        #     tagMapId = cursor.fetchall()[0][0] + 1
+        #     cursor.execute("SELECT max(Position) FROM TagMap")
+        #     Position = cursor.fetchall()[0][0] + 1
+        # else:
+        #     tagMapId = 1
+        #     Position = 0
 
         for i in notes:
-            uuid_value = str(uuid.uuid4()).lower()
-            uuid_value2 = str(uuid.uuid4()).lower()
+            cursor.execute("""INSERT INTO InputField ('LocationId', 'TextTag', 'Value') VALUES ('{0}', 'tt{1}', '{2}')""".format(locationId, questions[i].get("data-pid")+1, questions[i].text))
 
-            cursor.execute("""INSERT INTO UserMark ('UserMarkId', 'ColorIndex', 'LocationId', 'StyleIndex', 'UserMarkGuid', 'Version')
-            VALUES ('{0}', '2', '{1}', '0', '{2}', '1');""".format(userMarkId, locationId, uuid_value))
+            # uuid_value = str(uuid.uuid4()).lower()
+            # uuid_value2 = str(uuid.uuid4()).lower()
+
+            # cursor.execute("""INSERT INTO UserMark ('UserMarkId', 'ColorIndex', 'LocationId', 'StyleIndex', 'UserMarkGuid', 'Version')
+            # VALUES ('{0}', '2', '{1}', '0', '{2}', '1');""".format(userMarkId, locationId, uuid_value))
             
-            cursor.execute("""INSERT INTO "BlockRange" ("BlockRangeId", "BlockType", "Identifier", "StartToken", "EndToken", "UserMarkId")
-            VALUES ('{0}', '1', '{1}', '0', '{2}', '{3}');""".format(blockRangeId, questions[i].get("data-pid"), questions[i].text.find(".")-1, userMarkId))
+            # cursor.execute("""INSERT INTO "BlockRange" ("BlockRangeId", "BlockType", "Identifier", "StartToken", "EndToken", "UserMarkId")
+            # VALUES ('{0}', '1', '{1}', '0', '{2}', '{3}');""".format(blockRangeId, questions[i].get("data-pid"), questions[i].text.find(".")-1, userMarkId))
             
-            cursor.execute("""INSERT INTO Note ("NoteId", "Guid", "UserMarkId", "LocationId", "Title", "Content", "LastModified", "Created", "BlockType", "BlockIdentifier") 
-            VALUES ('{0}', '{1}', '{2}', '{3}', '{4}', '{5}', '{6}', '{7}', '1', '{8}');""".format(noteId, uuid_value2, userMarkId, locationId, questions[i].text, notes[i].replace("'", '"'), now_iso, now_utc_iso, questions[i].get("data-pid")))
+            # cursor.execute("""INSERT INTO Note ("NoteId", "Guid", "UserMarkId", "LocationId", "Title", "Content", "LastModified", "Created", "BlockType", "BlockIdentifier") 
+            # VALUES ('{0}', '{1}', '{2}', '{3}', '{4}', '{5}', '{6}', '{7}', '1', '{8}');""".format(noteId, uuid_value2, userMarkId, locationId, questions[i].text, notes[i].replace("'", '"'), now_iso, now_utc_iso, questions[i].get("data-pid")))
 
-            cursor.execute("INSERT INTO TagMap ('TagMapId', 'NoteId', 'TagId', 'Position') VALUES ('{0}', '{1}', '{2}', '{3}')".format(tagMapId, noteId, tagId, Position))
-            userMarkId += 1
-            blockRangeId += 1
-            noteId +=1
-            tagMapId += 1
-            Position +=1
-
+            # cursor.execute("INSERT INTO TagMap ('TagMapId', 'NoteId', 'TagId', 'Position') VALUES ('{0}', '{1}', '{2}', '{3}')".format(tagMapId, noteId, tagId, Position))
+            # userMarkId += 1
+            # blockRangeId += 1
+            # noteId +=1
+            # tagMapId += 1
+            # Position +=1
 
         cursor.execute("UPDATE LastModified SET LastModified = '{0}'".format(now_iso))
 
@@ -308,25 +309,27 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
         connection = sqlite3.connect(dbFromUser)
         cursor = connection.cursor()
 
-        cursor.execute("""INSERT INTO Location (LocationId, DocumentId, IssueTagNumber, KeySymbol, MepsLanguage, Type)
-        VALUES (1, {0}, {1}, "w", 1, 0);""".format(documentId, articleId))
+        cursor.execute("""INSERT INTO Location (LocationId, DocumentId, IssueTagNumber, KeySymbol, Type)
+        VALUES (1, {0}, {1}, "w", 0);""".format(documentId, articleId))
 
-        cursor.execute("INSERT INTO Tag ('TagId', 'Type', 'Name') VALUES ('2', '1', 'jwlibrary-plus')")
+        #cursor.execute("INSERT INTO Tag ('TagId', 'Type', 'Name') VALUES ('2', '1', 'jwlibrary-plus')")
 
         for i in notes:
-            uuid_value = str(uuid.uuid4()).upper()
-            uuid_value2 = str(uuid.uuid4()).upper()
+            cursor.execute("""INSERT INTO InputField ('LocationId', 'TextTag', 'Value') VALUES ('{0}', 'tt{1}', '{2}')""".format(locationId, questions[i].get("data-pid")+1, questions[i].text))
 
-            cursor.execute("""INSERT INTO UserMark ('UserMarkId', 'ColorIndex', 'LocationId', 'StyleIndex', 'UserMarkGuid', 'Version')
-            VALUES ('{0}', '2', '1', '0', '{1}', '1');""".format(i+1,uuid_value))
+            # uuid_value = str(uuid.uuid4()).upper()
+            # uuid_value2 = str(uuid.uuid4()).upper()
 
-            cursor.execute ("""INSERT INTO "BlockRange" ("BlockRangeId", "BlockType", "Identifier", "StartToken", "EndToken", "UserMarkId")
-            VALUES ('{0}', '1', '{1}', '0', '{2}', '{3}');""".format(i+1, questions[i].get("data-pid"), questions[i].text.find(".")-1, i+1))
+            # cursor.execute("""INSERT INTO UserMark ('UserMarkId', 'ColorIndex', 'LocationId', 'StyleIndex', 'UserMarkGuid', 'Version')
+            # VALUES ('{0}', '2', '1', '0', '{1}', '1');""".format(i+1,uuid_value))
 
-            cursor.execute("""INSERT INTO Note ("NoteId", "Guid", "UserMarkId", "LocationId", "Title", "Content", "LastModified", "Created", "BlockType", "BlockIdentifier") 
-            VALUES ('{0}', '{1}', '{2}', '1', '{3}', '{4}', '{5}', '{6}', '1', '{7}');""".format(i+1, uuid_value2, i+1, questions[i].text, notes[i].replace("'", '"'), now_iso, now_utc_iso, questions[i].get("data-pid")))
+            # cursor.execute ("""INSERT INTO "BlockRange" ("BlockRangeId", "BlockType", "Identifier", "StartToken", "EndToken", "UserMarkId")
+            # VALUES ('{0}', '1', '{1}', '0', '{2}', '{3}');""".format(i+1, questions[i].get("data-pid"), questions[i].text.find(".")-1, i+1))
 
-            cursor.execute("INSERT INTO TagMap ('TagMapId', 'NoteId', 'TagId', 'Position') VALUES ('{0}', '{1}', '2', '{2}')".format(i+1,i+1,i))
+            # cursor.execute("""INSERT INTO Note ("NoteId", "Guid", "UserMarkId", "LocationId", "Title", "Content", "LastModified", "Created", "BlockType", "BlockIdentifier") 
+            # VALUES ('{0}', '{1}', '{2}', '1', '{3}', '{4}', '{5}', '{6}', '1', '{7}');""".format(i+1, uuid_value2, i+1, questions[i].text, notes[i].replace("'", '"'), now_iso, now_utc_iso, questions[i].get("data-pid")))
+
+            # cursor.execute("INSERT INTO TagMap ('TagMapId', 'NoteId', 'TagId', 'Position') VALUES ('{0}', '{1}', '2', '{2}')".format(i+1,i+1,i))
 
         cursor.execute("UPDATE LastModified SET LastModified = '{0}'".format(now_utc_iso))
 
