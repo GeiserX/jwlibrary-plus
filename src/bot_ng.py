@@ -104,14 +104,17 @@ async def language_select(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     user = update.effective_user
     logger.info("LANGUAGE_SELECT - User ID: {0}".format(user.id))
     
-    languages = [("English", "en"), ("Español", "es"), ("Italiano", "it"), ("Français", "fr"), ("Português", "pt"), ("Deutsch", "de"), ("Български", "bg")]
+    languages = [("English", "en"), ("Español", "es"), ("Français", "fr"), ("Português", "pt"), ("Deutsch", "de"), ("Български", "bg")]
     
     keyboard = []
     for name, code in languages:
         keyboard.append([InlineKeyboardButton(name, callback_data=code)])
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await update.message.reply_text('Please select your language / Por favor selecciona tu idioma', reply_markup=reply_markup)
+    if update.message:
+        await update.message.reply_text('Please select your language / Por favor selecciona tu idioma', reply_markup=reply_markup)
+    elif update.callback_query:
+        await update.callback_query.edit_message_text('Please select your language / Por favor selecciona tu idioma', reply_markup=reply_markup)
     return LANG_SELECT
 
 async def language_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -131,7 +134,8 @@ async def language_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     connection.close()
     
     # Acknowledge the selection
-    await query.edit_message_text("Language selected: {0}".format(lang_code))
+    _ = get_translation_function(context)
+    await query.edit_message_text(_("Idioma seleccionado: {0}").format(lang_code))
     
     # Proceed to next step: ask_backup
     return await ask_backup(update, context)
@@ -186,7 +190,10 @@ async def ask_date_or_url(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         [InlineKeyboardButton(_("Proporcionar URL"), callback_data='url')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(_("¿Deseas seleccionar una fecha o proporcionar una URL específica?"), reply_markup=reply_markup)
+    if update.message:
+        await update.message.reply_text(_("¿Deseas seleccionar una fecha o proporcionar una URL específica?"), reply_markup=reply_markup)
+    elif update.callback_query:
+        await update.callback_query.edit_message_text(_("¿Deseas seleccionar una fecha o proporcionar una URL específica?"), reply_markup=reply_markup)
     return RECEIVE_DATE_OR_URL_CHOICE
 
 async def receive_date_or_url_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -237,7 +244,7 @@ async def receive_date_selection(update: Update, context: ContextTypes.DEFAULT_T
     user = update.effective_user
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
-    cursor.execute("UPDATE Main SET WeekDelta = ? WHERE UserId = ?", (date_selection, user.id))
+    cursor.execute("UPDATE Main SET WeekDelta = ?, Url = null WHERE UserId = ?", (date_selection, user.id))
     connection.commit()
     connection.close()
     await query.edit_message_text(_("Fecha seleccionada."))
@@ -255,7 +262,7 @@ async def receive_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
             user = update.effective_user
             connection = sqlite3.connect("dbs/main.db")
             cursor = connection.cursor()
-            cursor.execute("UPDATE Main SET Url = ? WHERE UserId = ?", (url, user.id))
+            cursor.execute("UPDATE Main SET Url = ?, WeekDelta = null WHERE UserId = ?", (url, user.id))
             connection.commit()
             connection.close()
             await update.message.reply_text(_("URL guardada."))
@@ -284,14 +291,19 @@ async def show_questions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         if data[i]:
             questions_text += "{0}. {1}\n".format(i+1, data[i])
 
-    await update.message.reply_html(questions_text)
-    # Ask if user wants to customize the questions
     keyboard = [
         [InlineKeyboardButton(_("Sí"), callback_data='yes')],
         [InlineKeyboardButton(_("No"), callback_data='no')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(_("¿Deseas personalizar las preguntas o estás de acuerdo con las predeterminadas?"), reply_markup=reply_markup)
+
+    if update.message:
+        await update.message.reply_html(questions_text)
+        await update.message.reply_text(_("¿Deseas personalizar las preguntas o estás de acuerdo con las predeterminadas?"), reply_markup=reply_markup)
+    elif update.callback_query:
+        message = update.callback_query.message
+        await message.reply_html(questions_text)
+        await message.reply_text(_("¿Deseas personalizar las preguntas o estás de acuerdo con las predeterminadas?"), reply_markup=reply_markup)
     return CUSTOMIZE_QUESTIONS_YES_NO
 
 async def customize_questions_yes_no(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -366,8 +378,14 @@ async def ask_for_more_questions(update: Update, context: ContextTypes.DEFAULT_T
 async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
     _ = get_translation_function(context)
-    await update.message.reply_text(_("Comenzando la preparación. Por favor, espera..."))
-    await update.message.reply_chat_action(action=telegram.constants.ChatAction.TYPING)
+    if update.message:
+        await update.message.reply_text(_("Comenzando la preparación. Por favor, espera..."))
+        await update.message.reply_chat_action(action=telegram.constants.ChatAction.TYPING)
+    elif update.callback_query:
+        message = update.callback_query.message
+        await message.reply_text(_("Comenzando la preparación. Por favor, espera..."))
+        await context.bot.send_chat_action(chat_id=message.chat_id, action=telegram.constants.ChatAction.TYPING)
+ 
     # Call core_worker.main with appropriate parameters
     # Extract data from context.user_data and possibly from database
     # For example, get qs (questions), date/url, etc.
@@ -410,16 +428,28 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if any(qs):
         if (url is not None) and (date is not None):
             await update.message.reply_text(_("Tienes guardados una fecha y una URL. Se está tomando la fecha como valor predeterminado. Si quieres usar la URL, borra la fecha con /date_delete"))
-        if date is not None and (url is None):
+        if date is not None:
             # Logic to fetch URL based on date
             # Similar to your original w_prepare function
             await update.message.reply_text(_("Obteniendo el URL basado en la fecha seleccionada. Por favor, espera..."))
             # Implement the logic to get the URL from the date
             # Save the URL in the database and set url variable
-            # For this example, we assume url is obtained and set
-            # url = ...
+            # For this example, we'll assume you have a function get_url_from_date
 
-        if (url is not None) or (date is not None):
+            # TODO: Implement get_url_from_date function
+            # url = get_url_from_date(date, langSelected)
+            # For the sake of example, let's just log that we would fetch the URL
+            # Simulate fetching the URL based on date
+            url = "https://www.jw.org/fake-url-based-on-date"
+            # Save URL to database
+            connection = sqlite3.connect("dbs/main.db")
+            cursor = connection.cursor()
+            cursor.execute("UPDATE Main SET Url = ? WHERE UserId = ?", (url, user.id))
+            connection.commit()
+            connection.close()
+            await update.message.reply_text(_("URL obtenido a partir de la fecha seleccionada."))
+
+        if (url is not None):
             await update.message.reply_text(_("Comenzando peticiones a ChatGPT. Podría tardar incluso más de 10 minutos dependiendo del número de preguntas que hayas configurado."))
             filenamejw, filenamedoc, filenamepdf = core_worker.main(url, user.id, qs)
             if(os.path.isfile('userBackups/{0}.jwlibrary'.format(user.id))):
@@ -479,51 +509,60 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text(_("Operación cancelada."))
     return ConversationHandler.END
 
+async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user = update.effective_user
+    logger.info("CHANGE_LANGUAGE - User ID: {0}".format(user.id))
+    # Reuse language_select function
+    return await language_select(update, context)
+
 def main() -> None:
     application = Application.builder().token(os.environ["TOKEN"]).build()
+
+    # Define common handlers to allow /change_language from any state
+    common_handlers = [CommandHandler('change_language', change_language), CommandHandler('cancel', cancel)]
 
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
             LANG_SELECT: [
                 CallbackQueryHandler(language_selected)
-            ],
+            ] + common_handlers,
             RECEIVE_BACKUP_FILE: [
                 MessageHandler(filters.Document.ALL, receive_backup_file_document),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, receive_backup_file_text),
-            ],
+            ] + common_handlers,
             RECEIVE_DATE_OR_URL_CHOICE: [
                 CallbackQueryHandler(receive_date_or_url_choice)
-            ],
+            ] + common_handlers,
             RECEIVE_URL: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, receive_url)
-            ],
+            ] + common_handlers,
             RECEIVE_DATE_SELECTION: [
                 CallbackQueryHandler(receive_date_selection)
-            ],
+            ] + common_handlers,
             CUSTOMIZE_QUESTIONS_YES_NO: [
                 CallbackQueryHandler(customize_questions_yes_no)
-            ],
+            ] + common_handlers,
             RECEIVE_QUESTION_NUMBER: [
                 CallbackQueryHandler(receive_question_number)
-            ],
+            ] + common_handlers,
             RECEIVE_QUESTION_TEXT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, receive_question_text)
-            ],
+            ] + common_handlers,
             ASK_FOR_MORE_QUESTIONS: [
                 CallbackQueryHandler(ask_for_more_questions)
-            ],
+            ] + common_handlers,
             AFTER_PREPARATION: [
                 CallbackQueryHandler(after_preparation)
-            ],
+            ] + common_handlers,
         },
         fallbacks=[CommandHandler('cancel', cancel)],
+        allow_reentry=True,
     )
 
     application.add_handler(conv_handler)
 
     # You can add other handlers here if needed
-    # e.g., for /change_language command to allow users to change language later
 
     application.run_polling()
 
