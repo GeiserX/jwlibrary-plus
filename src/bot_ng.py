@@ -12,7 +12,7 @@ import sqlite3
 import validators
 from urllib.parse import urlparse
 import sys
-import core_worker  # Make sure to have your core_worker module available
+import core_worker  # Ensure core_worker module is correctly imported and accessible
 from collections import Counter
 import telegram
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -118,6 +118,7 @@ async def language_select(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await update.message.reply_text('Please select your language / Por favor selecciona tu idioma', reply_markup=reply_markup)
     elif update.callback_query:
         await update.callback_query.edit_message_text('Please select your language / Por favor selecciona tu idioma', reply_markup=reply_markup)
+    return ConversationHandler.END  # End conversation here if called from /change_language
 
 async def language_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
@@ -139,7 +140,7 @@ async def language_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     _ = get_translation_function(context)
     await query.edit_message_text(_("Idioma seleccionado: {0}").format(lang_code))
     
-    # Optionally, prompt the user to continue
+    # Optionally, inform the user to continue
     await query.message.reply_text(_("Tu idioma ha sido actualizado. Puedes continuar con /start para reiniciar el proceso."))
 
 async def ask_backup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -161,8 +162,9 @@ async def receive_backup_file_document(update: Update, context: ContextTypes.DEF
         # Save the file
         await file.download_to_drive('userBackups/{0}.jwlibrary'.format(user.id))
         # Run describe_jwlibrary and post output
-        notesN, inputN, tagMaptN, tagN, bookmarkN, lastModified, userMarkN = core_worker.describe_jwlibrary(user.id)
-        await update.message.reply_html(_("""Estado de tu archivo <code>.jwlibrary</code>:
+        try:
+            notesN, inputN, tagMaptN, tagN, bookmarkN, lastModified, userMarkN = core_worker.describe_jwlibrary(user.id)
+            await update.message.reply_html(_("""Estado de tu archivo <code>.jwlibrary</code>:
 <u>Notas:</u> {0}
 <u>Tags individuales:</u> {1}
 <u>Notas con tags:</u> {2}
@@ -170,12 +172,15 @@ async def receive_backup_file_document(update: Update, context: ContextTypes.DEF
 <u>Favoritos:</u> {4}
 <u>Frases subrayadas:</u> {5}
 <u>Última vez modificado:</u> {6}""").format(notesN, tagN, tagMaptN, inputN, bookmarkN, userMarkN, lastModified))
+        except Exception as e:
+            logger.error("Error in describe_jwlibrary: %s", e)
+            await update.message.reply_text(_("Ocurrió un error al analizar tu archivo. Continuaremos sin él."))
+        # Proceed to next step
+        return await ask_date_or_url(update, context)
     else:
-        await update.message.reply_text(_("Formato de archivo erróneo."))
+        await update.message.reply_text(_("Formato de archivo erróneo. Por favor, envía un archivo .jwlibrary válido."))
         # Ask again
         return RECEIVE_BACKUP_FILE
-    # Proceed to next step
-    return await ask_date_or_url(update, context)
 
 async def receive_backup_file_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_input = update.message.text.lower()
@@ -313,19 +318,21 @@ async def show_questions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         connection.close()
         questions_text += "\n".join(f"{i+1}. {q}" for i, q in enumerate(init_questions))
 
+    # Reworded question and buttons
+    question_text = _("¿Quieres personalizar las preguntas?")
     keyboard = [
-        [InlineKeyboardButton(_("Sí"), callback_data='yes')],
-        [InlineKeyboardButton(_("No"), callback_data='no')],
+        [InlineKeyboardButton(_("Sí, quiero personalizar"), callback_data='yes')],
+        [InlineKeyboardButton(_("No, usar predeterminadas"), callback_data='no')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     if update.message:
         await update.message.reply_html(questions_text)
-        await update.message.reply_text(_("¿Deseas personalizar las preguntas o estás de acuerdo con las predeterminadas?"), reply_markup=reply_markup)
+        await update.message.reply_text(question_text, reply_markup=reply_markup)
     elif update.callback_query:
         message = update.callback_query.message
         await message.reply_html(questions_text)
-        await message.reply_text(_("¿Deseas personalizar las preguntas o estás de acuerdo con las predeterminadas?"), reply_markup=reply_markup)
+        await message.reply_text(question_text, reply_markup=reply_markup)
     return CUSTOMIZE_QUESTIONS_YES_NO
 
 async def customize_questions_yes_no(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -403,15 +410,19 @@ async def ask_for_more_questions(update: Update, context: ContextTypes.DEFAULT_T
 async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
     _ = get_translation_function(context)
+    # Determine the message object
     if update.message:
-        await update.message.reply_text(_("Comenzando la preparación. Por favor, espera..."))
-        await update.message.reply_chat_action(action=telegram.constants.ChatAction.TYPING)
+        message = update.message
+        await message.reply_text(_("Comenzando la preparación. Por favor, espera..."))
+        await message.reply_chat_action(action=telegram.constants.ChatAction.TYPING)
     elif update.callback_query:
         message = update.callback_query.message
         await message.reply_text(_("Comenzando la preparación. Por favor, espera..."))
         await context.bot.send_chat_action(chat_id=message.chat_id, action=telegram.constants.ChatAction.TYPING)
-    # Extract data from context.user_data and possibly from database
-    # For example, get qs (questions), date/url, etc.
+    else:
+        # Handle unexpected cases
+        logger.error("No message or callback_query in update.")
+        return ConversationHandler.END
 
     # Fetch necessary data from the database
     connection = sqlite3.connect("dbs/main.db")
@@ -449,17 +460,11 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     if any(qs):
         if (url is not None) and (date is not None):
-            if update.message:
-                await update.message.reply_text(_("Tienes guardados una fecha y una URL. Se está tomando la fecha como valor predeterminado. Si quieres usar la URL, borra la fecha con /date_delete"))
-            elif update.callback_query:
-                await update.callback_query.message.reply_text(_("Tienes guardados una fecha y una URL. Se está tomando la fecha como valor predeterminado. Si quieres usar la URL, borra la fecha con /date_delete"))
+            await message.reply_text(_("Tienes guardados una fecha y una URL. Se está tomando la fecha como valor predeterminado. Si quieres usar la URL, borra la fecha con /date_delete"))
         if date is not None:
             # Logic to fetch URL based on date
             if url is None:
-                if update.message:
-                    await update.message.reply_text(_("Obteniendo el URL basado en la fecha seleccionada. Por favor, espera..."))
-                elif update.callback_query:
-                    await update.callback_query.message.reply_text(_("Obteniendo el URL basado en la fecha seleccionada. Por favor, espera..."))
+                await message.reply_text(_("Obteniendo el URL basado en la fecha seleccionada. Por favor, espera..."))
                 # Implement the logic to get the URL from the date
                 # Fetch the URL based on date and language
                 # --- Begin logic to fetch URL based on date ---
@@ -498,12 +503,17 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                     publication = cursor.fetchall()
                     cursor.close()
 
-                    lang = "S"  # For Spanish; adjust according to langSelected
-                    if langSelected == 'es':
-                        lang = 'S'
-                    elif langSelected == 'en':
-                        lang = 'E'
-                    # Add other language codes as needed
+                    # Map langSelected to JW language codes
+                    lang_codes = {
+                        'es': 'S',
+                        'en': 'E',
+                        'fr': 'F',
+                        'pt': 'P',
+                        'de': 'D',
+                        'bg': 'B',
+                        # Add other language codes as needed
+                    }
+                    lang = lang_codes.get(langSelected, 'E')
 
                     year = publication[0][5]
                     symbol = publication[0][2]
@@ -519,62 +529,43 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                     cursor.execute("UPDATE Main SET Url = ? WHERE UserId = ?", (url, user.id))
                     connection.commit()
                     connection.close()
-                    if update.message:
-                        await update.message.reply_text(_("URL obtenido a partir de la fecha seleccionada."))
-                    elif update.callback_query:
-                        await update.callback_query.message.reply_text(_("URL obtenido a partir de la fecha seleccionada."))
+                    await message.reply_text(_("URL obtenido a partir de la fecha seleccionada."))
                 except Exception as e:
                     logger.error("Error fetching URL based on date: %s", e)
-                    if update.message:
-                        await update.message.reply_text(_("No se pudo obtener el URL basado en la fecha seleccionada."))
-                    elif update.callback_query:
-                        await update.callback_query.message.reply_text(_("No se pudo obtener el URL basado en la fecha seleccionada."))
+                    await message.reply_text(_("No se pudo obtener el URL basado en la fecha seleccionada."))
                     return ConversationHandler.END
                 # --- End logic to fetch URL based on date ---
 
         if (url is not None):
-            if update.message:
-                await update.message.reply_text(_("Comenzando peticiones a ChatGPT. Podría tardar incluso más de 10 minutos dependiendo del número de preguntas que hayas configurado."))
-            elif update.callback_query:
-                await update.callback_query.message.reply_text(_("Comenzando peticiones a ChatGPT. Podría tardar incluso más de 10 minutos dependiendo del número de preguntas que hayas configurado."))
+            await message.reply_text(_("Comenzando peticiones a ChatGPT. Podría tardar incluso más de 10 minutos dependiendo del número de preguntas que hayas configurado."))
+
             try:
                 filenamejw, filenamedoc, filenamepdf = core_worker.main(url, user.id, qs)
-                if(os.path.isfile('userBackups/{0}.jwlibrary'.format(user.id))):
-                    if update.message:
-                        await update.message.reply_text(_("Aquí tienes tu fichero, impórtalo en JW Library. Recuerda hacer una copia de seguridad para no perder los datos, ya que proporcionaste tu archivo .jwlibrary"))
-                    elif update.callback_query:
-                        await update.callback_query.message.reply_text(_("Aquí tienes tu fichero, impórtalo en JW Library. Recuerda hacer una copia de seguridad para no perder los datos, ya que proporcionaste tu archivo .jwlibrary"))
+                if os.path.isfile('userBackups/{0}.jwlibrary'.format(user.id)):
+                    await message.reply_text(_("Aquí tienes tu fichero, impórtalo en JW Library. Recuerda hacer una copia de seguridad para no perder los datos, ya que proporcionaste tu archivo .jwlibrary"))
                 else:
-                    if update.message:
-                        await update.message.reply_text(_("Aquí tienes tu fichero, impórtalo en JW Library. Al no haber proporcionado tu copia de seguridad, hazlo con precaución."))
-                    elif update.callback_query:
-                        await update.callback_query.message.reply_text(_("Aquí tienes tu fichero, impórtalo en JW Library. Al no haber proporcionado tu copia de seguridad, hazlo con precaución."))
-                await update.message.reply_document(document=open(filenamejw, "rb"))
+                    await message.reply_text(_("Aquí tienes tu fichero, impórtalo en JW Library. Al no haber proporcionado tu copia de seguridad, hazlo con precaución."))
+
+                # Send the JW Library file
+                await message.reply_document(document=open(filenamejw, "rb"))
                 os.remove(filenamejw)
 
-                await update.message.reply_text(_("Aquí también encontrarás los archivos en formato Word y PDF"))
-                await update.message.reply_document(document=open(filenamedoc, "rb"))
-                await update.message.reply_document(document=open(filenamepdf, "rb"))
+                await message.reply_text(_("Aquí también encontrarás los archivos en formato Word y PDF"))
+                await message.reply_document(document=open(filenamedoc, "rb"))
                 os.remove(filenamedoc)
+
+                await message.reply_document(document=open(filenamepdf, "rb"))
                 os.remove(filenamepdf)
+
             except Exception as e:
                 logger.error("Error in core_worker.main: %s", e)
-                if update.message:
-                    await update.message.reply_text(_("Ocurrió un error al preparar los archivos. Por favor, inténtalo de nuevo más tarde."))
-                elif update.callback_query:
-                    await update.callback_query.message.reply_text(_("Ocurrió un error al preparar los archivos. Por favor, inténtalo de nuevo más tarde."))
+                await message.reply_text(_("Ocurrió un error al preparar los archivos. Por favor, inténtalo de nuevo más tarde."))
                 return ConversationHandler.END
         else:
-            if update.message:
-                await update.message.reply_text(_("No has seleccionado ninguna fecha o URL"))
-            elif update.callback_query:
-                await update.callback_query.message.reply_text(_("No has seleccionado ninguna fecha o URL"))
+            await message.reply_text(_("No has seleccionado ninguna fecha o URL"))
             return ConversationHandler.END
     else:
-        if update.message:
-            await update.message.reply_text(_("Todas las preguntas están vacías"))
-        elif update.callback_query:
-            await update.callback_query.message.reply_text(_("Todas las preguntas están vacías"))
+        await message.reply_text(_("Todas las preguntas están vacías"))
         return ConversationHandler.END
 
     # After preparation, ask the user if they want to prepare another article
@@ -583,10 +574,7 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         [InlineKeyboardButton(_("No"), callback_data='no')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    if update.message:
-        await update.message.reply_text(_("¿Deseas preparar con otras preguntas u otro artículo de La Atalaya?\nNota: Las preguntas ahora se eliminan."), reply_markup=reply_markup)
-    elif update.callback_query:
-        await update.callback_query.message.reply_text(_("¿Deseas preparar con otras preguntas u otro artículo de La Atalaya?\nNota: Las preguntas ahora se eliminan."), reply_markup=reply_markup)
+    await message.reply_text(_("¿Deseas preparar con otras preguntas u otro artículo de La Atalaya?\nNota: Las preguntas ahora se eliminan."), reply_markup=reply_markup)
     return AFTER_PREPARATION
 
 async def after_preparation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -605,12 +593,14 @@ async def after_preparation(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     )
     connection.commit()
     connection.close()
+
+    message = query.message
+
     if user_choice == 'yes':
-        # Restart the process from ask_backup
-        await query.edit_message_text(_("Comenzando de nuevo..."))
+        await message.reply_text(_("Comenzando de nuevo..."))
         return await ask_backup(update, context)
     else:
-        await query.edit_message_text(_("Las preguntas ahora están eliminadas. Para ejecutar el bot nuevamente, por favor escribe /start"))
+        await message.reply_text(_("Las preguntas ahora están eliminadas. Para ejecutar el bot nuevamente, por favor escribe /start"))
         # Conversation ends
         context.user_data['conversation_active'] = False
         return ConversationHandler.END
@@ -627,7 +617,8 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     logger.info("CHANGE_LANGUAGE - User ID: {0}".format(user.id))
-    await language_select(update, context)  # Call the language selection function
+    # Reuse language_select function
+    await language_select(update, context)
 
 def main() -> None:
     application = Application.builder().token(os.environ["TOKEN"]).build()
@@ -642,9 +633,6 @@ def main() -> None:
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
-            LANG_SELECT: [
-                CallbackQueryHandler(language_selected)
-            ] + common_handlers,
             RECEIVE_BACKUP_FILE: [
                 MessageHandler(filters.Document.ALL, receive_backup_file_document),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, receive_backup_file_text),
