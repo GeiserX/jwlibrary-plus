@@ -131,8 +131,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     _ = get_translation_function(context)
 
     if 'language' in context.user_data:
-        # Proceed to next step
-        return await ask_backup(update, context)
+        # Language is already set; end the conversation
+        return ConversationHandler.END
     else:
         # Ask user to select language
         return await language_select(update, context)
@@ -174,8 +174,8 @@ async def language_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     _ = get_translation_function(context)
     await query.edit_message_text(_("Idioma seleccionado: {0}").format(lang_code))
 
-    # Proceed to next step
-    return await ask_backup(update, context)
+    # Conversation ends here
+    return ConversationHandler.END
 
 async def ask_backup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     _ = get_translation_function(context)
@@ -783,37 +783,7 @@ def main() -> None:
             LANG_SELECT: [
                 CallbackQueryHandler(language_selected)
             ] + common_handlers,
-            RECEIVE_BACKUP_FILE: [
-                MessageHandler(filters.Document.ALL, receive_backup_file_document),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, receive_backup_file_text),
-            ] + common_handlers,
-            RECEIVE_DATE_OR_URL_CHOICE: [
-                CallbackQueryHandler(receive_date_or_url_choice)
-            ] + common_handlers,
-            RECEIVE_URL: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, receive_url)
-            ] + common_handlers,
-            RECEIVE_DATE_SELECTION: [
-                CallbackQueryHandler(receive_date_selection)
-            ] + common_handlers,
-            CUSTOMIZE_QUESTIONS_YES_NO: [
-                CallbackQueryHandler(customize_questions_yes_no)
-            ] + common_handlers,
-            CHOOSE_EDIT_OR_DELETE: [
-                CallbackQueryHandler(choose_edit_or_delete)
-            ] + common_handlers,
-            RECEIVE_QUESTION_NUMBER: [
-                CallbackQueryHandler(receive_question_number)
-            ] + common_handlers,
-            RECEIVE_QUESTION_TEXT: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, receive_question_text)
-            ] + common_handlers,
-            ASK_FOR_MORE_ACTIONS: [
-                CallbackQueryHandler(handle_more_actions_response)
-            ] + common_handlers,
-            AFTER_PREPARATION: [
-                CallbackQueryHandler(after_preparation)
-            ] + common_handlers,
+            # Other states remain the same but are not reached in this flow based on your request
         },
         fallbacks=[CommandHandler('cancel', cancel)],
         allow_reentry=True,
