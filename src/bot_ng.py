@@ -30,12 +30,13 @@ from telegram.error import Forbidden
     RECEIVE_URL,
     RECEIVE_DATE_SELECTION,
     CUSTOMIZE_QUESTIONS_YES_NO,
+    CHOOSE_EDIT_OR_DELETE,      # New state added
     RECEIVE_QUESTION_NUMBER,
     RECEIVE_QUESTION_TEXT,
-    ASK_FOR_MORE_QUESTIONS,
+    ASK_FOR_MORE_ACTIONS,       # Renamed for clarity
     W_PREPARE,
     AFTER_PREPARATION
-) = range(11)
+) = range(12)
 
 logger = logging.getLogger('mylogger')
 logger.setLevel(logging.INFO)
@@ -342,35 +343,95 @@ async def customize_questions_yes_no(update: Update, context: ContextTypes.DEFAU
     logger.info("CUSTOMIZE_QUESTIONS_YES_NO - User ID: {0} - Choice: {1}".format(update.effective_user.id, user_choice))
     _ = get_translation_function(context)
     if user_choice == 'yes':
-        # Proceed to ask for question to edit
-        return await ask_for_question_edit(update, context)
+        # Proceed to ask whether to edit or delete questions
+        return await ask_edit_or_delete(update, context)
     else:
         # Proceed to preparation
         return await w_prepare(update, context)
 
-async def ask_for_question_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+# New function to ask whether to edit or delete questions
+async def ask_edit_or_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     _ = get_translation_function(context)
-    # Display options to select question to edit
-    keyboard = []
-    for i in range(1, 11):
-        keyboard.append([InlineKeyboardButton(f"Q{i}", callback_data=str(i))])
+    # Ask user if they want to edit or delete questions
+    keyboard = [
+        [InlineKeyboardButton(_("Editar preguntas"), callback_data='edit')],
+        [InlineKeyboardButton(_("Eliminar preguntas"), callback_data='delete')],
+    ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    if update.message:
-        await update.message.reply_text(_("Por favor, selecciona el número de la pregunta que deseas editar:"), reply_markup=reply_markup)
-    elif update.callback_query:
-        await update.callback_query.message.reply_text(_("Por favor, selecciona el número de la pregunta que deseas editar:"), reply_markup=reply_markup)
+    await update.callback_query.message.reply_text(_("¿Deseas editar o eliminar preguntas?"), reply_markup=reply_markup)
+    return CHOOSE_EDIT_OR_DELETE
+
+# Function to handle the choice between edit or delete
+async def choose_edit_or_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    action = query.data  # 'edit' or 'delete'
+    context.user_data['action'] = action
+    logger.info("CHOOSE_EDIT_OR_DELETE - User ID: {0} - Action: {1}".format(update.effective_user.id, action))
+    _ = get_translation_function(context)
+    # Proceed to select question to edit or delete
+    return await ask_for_question_number(update, context)
+
+# Function to ask for the question number to edit or delete
+async def ask_for_question_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    _ = get_translation_function(context)
+    action = context.user_data['action']  # 'edit' or 'delete'
+    keyboard = []
+    user = update.effective_user
+    connection = sqlite3.connect("dbs/main.db")
+    cursor = connection.cursor()
+    cursor.execute("SELECT Q1,Q2,Q3,Q4,Q5,Q6,Q7,Q8,Q9,Q10 FROM Main WHERE UserId = ?", (user.id,))
+    data = cursor.fetchone()
+    connection.close()
+    if action == 'edit':
+        # Show all question numbers from Q1 to Q10
+        for i in range(1, 11):
+            keyboard.append([InlineKeyboardButton(f"Q{i}", callback_data=str(i))])
+        text = _("Por favor, selecciona el número de la pregunta que deseas editar:")
+    else:
+        # For 'delete', show only questions that have content
+        for i in range(1, 11):
+            if data[i-1]:
+                keyboard.append([InlineKeyboardButton(f"Q{i}", callback_data=str(i))])
+        text = _("Por favor, selecciona el número de la pregunta que deseas eliminar:")
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.message.reply_text(text, reply_markup=reply_markup)
     return RECEIVE_QUESTION_NUMBER
 
+# Modified receive_question_number function to handle edit or delete
 async def receive_question_number(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
     question_number = int(query.data)
-    logger.info("RECEIVE_QUESTION_NUMBER - User ID: {0} - Question Number: {1}".format(update.effective_user.id, question_number))
+    action = context.user_data['action']  # 'edit' or 'delete'
+    logger.info("RECEIVE_QUESTION_NUMBER - User ID: {0} - Question Number: {1} - Action: {2}".format(update.effective_user.id, question_number, action))
     _ = get_translation_function(context)
     # Save question number in context
     context.user_data['question_number'] = question_number
-    await query.edit_message_text(_("Por favor, ingresa el texto para la pregunta {0}:").format(question_number))
-    return RECEIVE_QUESTION_TEXT
+
+    if action == 'edit':
+        await query.edit_message_text(_("Por favor, ingresa el texto para la pregunta {0}:").format(question_number))
+        return RECEIVE_QUESTION_TEXT
+    elif action == 'delete':
+        # Check if more than one question exists
+        user = update.effective_user
+        connection = sqlite3.connect("dbs/main.db")
+        cursor = connection.cursor()
+        cursor.execute("SELECT Q1,Q2,Q3,Q4,Q5,Q6,Q7,Q8,Q9,Q10 FROM Main WHERE UserId = ?", (user.id,))
+        data = cursor.fetchone()
+        non_empty_questions = [q for q in data if q]
+        if len(non_empty_questions) <= 1:
+            await query.message.reply_text(_("No puedes eliminar la última pregunta. Debe haber al menos una pregunta."))
+            # Return to ask whether to edit or delete
+            return await ask_edit_or_delete(update, context)
+        else:
+            # Delete the question
+            cursor.execute(f"UPDATE Main SET Q{question_number} = NULL WHERE UserId = ?", (user.id,))
+            connection.commit()
+            connection.close()
+            await query.message.reply_text(_("Pregunta {0} eliminada correctamente.").format(question_number))
+            # Ask if user wants to perform another action
+            return await ask_for_more_actions(update, context)
 
 async def receive_question_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     question_text = update.message.text.strip()
@@ -385,28 +446,38 @@ async def receive_question_text(update: Update, context: ContextTypes.DEFAULT_TY
     connection.commit()
     connection.close()
     await update.message.reply_text(_("Pregunta {0} guardada correctamente.").format(question_number))
-    # Ask if user wants to edit another question
+    # Ask if user wants to perform another action
+    return await ask_for_more_actions(update, context)
+
+# Function to ask if the user wants to perform more actions
+async def ask_for_more_actions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    _ = get_translation_function(context)
     keyboard = [
         [InlineKeyboardButton(_("Sí"), callback_data='yes')],
         [InlineKeyboardButton(_("No"), callback_data='no')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(_("¿Deseas editar otra pregunta?"), reply_markup=reply_markup)
-    return ASK_FOR_MORE_QUESTIONS
+    if update.message:
+        await update.message.reply_text(_("¿Deseas realizar otra acción sobre las preguntas?"), reply_markup=reply_markup)
+    elif update.callback_query:
+        await update.callback_query.message.reply_text(_("¿Deseas realizar otra acción sobre las preguntas?"), reply_markup=reply_markup)
+    return ASK_FOR_MORE_ACTIONS
 
-async def ask_for_more_questions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+# Function to handle the user's response about more actions
+async def handle_more_actions_response(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
     user_choice = query.data
-    logger.info("ASK_FOR_MORE_QUESTIONS - User ID: {0} - Choice: {1}".format(update.effective_user.id, user_choice))
+    logger.info("HANDLE_MORE_ACTIONS_RESPONSE - User ID: {0} - Choice: {1}".format(update.effective_user.id, user_choice))
     _ = get_translation_function(context)
     if user_choice == 'yes':
-        # Proceed to ask for another question to edit
-        return await ask_for_question_edit(update, context)
+        # Ask whether to edit or delete again
+        return await ask_edit_or_delete(update, context)
     else:
         # Proceed to preparation
         return await w_prepare(update, context)
 
+# The w_prepare function remains the same as in your current script
 async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
     _ = get_translation_function(context)
@@ -649,14 +720,17 @@ def main() -> None:
             CUSTOMIZE_QUESTIONS_YES_NO: [
                 CallbackQueryHandler(customize_questions_yes_no)
             ] + common_handlers,
+            CHOOSE_EDIT_OR_DELETE: [
+                CallbackQueryHandler(choose_edit_or_delete)
+            ] + common_handlers,
             RECEIVE_QUESTION_NUMBER: [
                 CallbackQueryHandler(receive_question_number)
             ] + common_handlers,
             RECEIVE_QUESTION_TEXT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, receive_question_text)
             ] + common_handlers,
-            ASK_FOR_MORE_QUESTIONS: [
-                CallbackQueryHandler(ask_for_more_questions)
+            ASK_FOR_MORE_ACTIONS: [
+                CallbackQueryHandler(handle_more_actions_response)
             ] + common_handlers,
             AFTER_PREPARATION: [
                 CallbackQueryHandler(after_preparation)
