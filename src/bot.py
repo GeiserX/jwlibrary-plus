@@ -688,7 +688,7 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await select_url(update, context)
 
         if (url is not None) or (date is not None):
-            await update.message.reply_text(_("Comenzando peticiones a ChatGPT. Podría tardar incluso más de 10 minutos dependiendo del número de preguntas que haya configurado y su velocidad de respuesta"))
+            await update.message.reply_text(_("Comenzando peticiones a ChatGPT. Podría tardar unos minutos dependiendo del número de preguntas que haya configurado y su velocidad de respuesta"))
             filenamejw, filenamedoc, filenamepdf = core_worker.main(url, user.id, qs)
             if(os.path.isfile('userBackups/{0}.jwlibrary'.format(user.id))):
                 await update.message.reply_text(_("Aquí tiene su fichero, impórtelo a JW Library. Recuerde hacer una <b>copia de seguridad</b> para no perder los datos, ya que no ha proporcionado su archivo .jwlibrary"))
