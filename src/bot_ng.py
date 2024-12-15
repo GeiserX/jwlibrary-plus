@@ -106,7 +106,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             if time_since_last_run < timedelta(hours=8):
                 remaining_time = timedelta(hours=8) - time_since_last_run
                 hours, remainder = divmod(remaining_time.seconds, 3600)
-                minutes, _ = divmod(remainder, 60)
+                minutes, seconds_unused = divmod(remainder, 60)  # Changed _ to seconds_unused
                 await update.message.reply_text(
                     _("Por favor, inténtelo de nuevo dentro de {} horas y {} minutos. Así puedo controlar mejor los gastos, ya que es gratuito. Si tiene algún problema, contacte con @geiserdrums").format(hours, minutes)
                 )
@@ -320,6 +320,9 @@ async def select_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
             week_ranges.append(f"{start.strftime('%-d de %B')}-{end.strftime('%-d de %B').strip()}")
         start = end + timedelta(days=1)
 
+    # Save the week_ranges in context.user_data
+    context.user_data['week_ranges'] = week_ranges
+
     keyboard = []
     for i, button in enumerate(week_ranges):
         keyboard.append([InlineKeyboardButton(button, callback_data=str(i))])
@@ -334,6 +337,14 @@ async def receive_date_selection(update: Update, context: ContextTypes.DEFAULT_T
     date_selection = int(query.data)
     logger.info("RECEIVE_DATE_SELECTION - User ID: {0} - Selection: {1}".format(update.effective_user.id, date_selection))
     _ = get_translation_function(context)
+
+    # Retrieve week_ranges from context.user_data
+    week_ranges = context.user_data.get('week_ranges', [])
+    if week_ranges and 0 <= date_selection < len(week_ranges):
+        selected_week = week_ranges[date_selection]
+    else:
+        selected_week = _("Fecha desconocida")
+
     # Save date selection in context
     context.user_data['date_selection'] = date_selection
     # Save to database
@@ -343,7 +354,7 @@ async def receive_date_selection(update: Update, context: ContextTypes.DEFAULT_T
     cursor.execute("UPDATE Main SET WeekDelta = ?, Url = null WHERE UserId = ?", (date_selection, user.id))
     connection.commit()
     connection.close()
-    await query.edit_message_text(_("Fecha seleccionada."))
+    await query.edit_message_text(_("Fecha seleccionada: {0}").format(selected_week))
     # Proceed to next step
     return await show_questions(update, context)
 
@@ -683,14 +694,16 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                 # --- End logic to fetch URL based on date ---
 
         if (url is not None):
-            await message.reply_text(_("Comenzando peticiones a ChatGPT. Podría tardar incluso más de 10 minutos dependiendo del número de preguntas que hayas configurado."))
+            await message.reply_text(_("Comenzando peticiones a ChatGPT. Podría tardar varios minutos dependiendo del número de preguntas que hayas configurado."))
 
             try:
+                # Call the modified core_worker.main function
                 filenamejw, filenamedoc, filenamepdf = core_worker.main(url, user.id, qs)
+                
                 if os.path.isfile('userBackups/{0}.jwlibrary'.format(user.id)):
-                    await message.reply_text(_("Aquí tienes tu fichero, impórtalo en JW Library. Recuerda hacer una copia de seguridad para no perder los datos, ya que proporcionaste tu archivo .jwlibrary"))
+                    await message.reply_text(_("Aquí tienes tu fichero, impórtalo en JW Library."))
                 else:
-                    await message.reply_text(_("Aquí tienes tu fichero, impórtalo en JW Library. Al no haber proporcionado tu copia de seguridad, hazlo con precaución."))
+                    await message.reply_text(_("Aquí tienes tu fichero, impórtalo en JW Library.\nNota: Al no haber proporcionado tu copia de seguridad, hazlo con precaución, puedes perder tus datos de la app."))
 
                 # Send the JW Library file
                 await message.reply_document(document=open(filenamejw, "rb"))
@@ -720,7 +733,7 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         [InlineKeyboardButton(_("No"), callback_data='no')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await message.reply_text(_("¿Deseas preparar con otras preguntas u otro artículo de La Atalaya?\nNota: Las preguntas ahora se eliminan."), reply_markup=reply_markup)
+    await message.reply_text(_("¿Deseas preparar con otras preguntas u otro artículo de La Atalaya?\nNota: Si decide no seguir, las preguntas adicionales que haya añadido se eliminarán."), reply_markup=reply_markup)
     return AFTER_PREPARATION
 
 async def after_preparation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -738,22 +751,24 @@ async def after_preparation(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
         cursor.execute("SELECT LastRun FROM Main WHERE UserId = ?", (user.id,))
-        last_run_str = cursor.fetchone()[0]
+        last_run_row = cursor.fetchone()
         connection.close()
 
-        if last_run_str:
-            last_run = datetime.fromisoformat(last_run_str)
-            time_since_last_run = now - last_run
-            if time_since_last_run < timedelta(hours=8):
-                remaining_time = timedelta(hours=8) - time_since_last_run
-                hours, remainder = divmod(remaining_time.seconds, 3600)
-                minutes, _ = divmod(remainder, 60)
-                await query.message.reply_text(
-                    _("Por favor, inténtelo de nuevo dentro de {} horas y {} minutos. Así puedo controlar mejor los gastos, ya que es gratuito. Si tiene algún problema, contacte con @geiserdrums").format(hours, minutes)
-                )
-                # Conversation ends
-                context.user_data['conversation_active'] = False
-                return ConversationHandler.END
+        if last_run_row:
+            last_run_str = last_run_row[0]
+            if last_run_str:
+                last_run = datetime.fromisoformat(last_run_str)
+                time_since_last_run = now - last_run
+                if time_since_last_run < timedelta(hours=8):
+                    remaining_time = timedelta(hours=8) - time_since_last_run
+                    hours, remainder = divmod(remaining_time.seconds, 3600)
+                    minutes, seconds_unused = divmod(remainder, 60)
+                    await query.message.reply_text(
+                        _("Por favor, inténtelo de nuevo dentro de {0} horas y {1} minutos. Así puedo controlar mejor los gastos, ya que es gratuito. Si tiene algún problema, contacte con @geiserdrums").format(hours, minutes)
+                    )
+                    # Conversation ends
+                    context.user_data['conversation_active'] = False
+                    return ConversationHandler.END
 
     # Delete questions in database
     connection = sqlite3.connect("dbs/main.db")
@@ -769,7 +784,7 @@ async def after_preparation(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         await query.message.reply_text(_("Comenzando de nuevo..."))
         return await ask_backup(update, context)
     else:
-        await query.message.reply_text(_("Las preguntas ahora están eliminadas. Para ejecutar el bot nuevamente, por favor escribe /start"))
+        await query.message.reply_text(_("Las preguntas se han eliminado. Para ejecutar el bot nuevamente, por favor escribe /start"))
         # Conversation ends
         context.user_data['conversation_active'] = False
         return ConversationHandler.END
