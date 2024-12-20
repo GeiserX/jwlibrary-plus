@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 import sys
 import core_worker  # Ensure core_worker module is correctly imported and accessible
 from collections import Counter
+from babel.dates import format_date
 import telegram
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -43,12 +44,6 @@ logFormatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(mes
 consoleHandler = logging.StreamHandler(sys.stdout)
 consoleHandler.setFormatter(logFormatter)
 logger.addHandler(consoleHandler)
-
-init_questions = [
-    "Una ilustración o ejemplo para explicar algún punto principal del párrafo",
-    "Una experiencia en concreto, aportando referencias exactas de jw.org, que esté muy relacionada con el párrafo",
-    "Una explicación sobre uno de los textos que aparezcan, que aplique al párrafo. Usa la Biblia de Estudio de los Testigos de Jehová"
-]
 
 def get_translation_function(context):
     lang_code = context.user_data.get('language', 'es')  # Default to 'es' if not set
@@ -103,12 +98,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         if last_run_str:
             last_run = datetime.fromisoformat(last_run_str)
             time_since_last_run = now - last_run
-            if time_since_last_run < timedelta(hours=8):
-                remaining_time = timedelta(hours=8) - time_since_last_run
-                hours, remainder = divmod(remaining_time.seconds, 3600)
-                minutes, seconds_unused = divmod(remainder, 60)  # Changed _ to seconds_unused
+            if time_since_last_run < timedelta(hours=1):
+                remaining_time = timedelta(hours=1) - time_since_last_run
+                minutes, remaining = divmod(remaining_time.seconds, 60)
                 await update.message.reply_text(
-                    _("Por favor, inténtelo de nuevo dentro de {} horas y {} minutos. Así puedo controlar mejor los gastos, ya que es gratuito. Si tiene algún problema, contacte con @geiserdrums").format(hours, minutes)
+                    _("Por favor, inténtelo de nuevo dentro de {} minutos. Así puedo controlar mejor los gastos, ya que es gratuito. Si tiene algún problema, contacte con @geiserdrums").format(minutes)
                 )
                 return ConversationHandler.END  # End the conversation
     else:
@@ -160,8 +154,18 @@ async def language_select(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     user = update.effective_user
     logger.info("LANGUAGE_SELECT - User ID: {0}".format(user.id))
 
-    languages = [("English", "en"), ("Español", "es"), ("Français", "fr"), ("Português", "pt"), ("Deutsch", "de"), ("Български", "bg")]
-
+    languages = [
+        ("English", "en"),
+        ("Español", "es"),
+        ("Italiano", "it"),
+        ("Français", "fr"),
+        ("Português (Portugal)", "pt-PT"),
+        ("Português (Brasil)", "pt-BR"),
+        ("Deutsch", "de"),
+        ("Nederlands", "nl"),
+        ("Български", "bg"),
+        ("Македонски", "mk")
+    ]
     keyboard = []
     for name, code in languages:
         keyboard.append([InlineKeyboardButton(name, callback_data='lang_' + code)])
@@ -311,13 +315,21 @@ async def select_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     now = datetime.now(pytz.timezone('Europe/Madrid'))
     start = now - timedelta(days=now.weekday())
     week_ranges = []
+    # Get the language code
+    lang_code = context.user_data.get('language', 'es')  # Default to 'es' if not set
+    babel_locale = lang_code.replace('-', '_')  # Adjust for Babel locale format
 
     for week in range(4):
         end = start + timedelta(days=6)
         if start.month == end.month:
-            week_ranges.append(f"{start.strftime('%-d')}-{end.strftime('%-d de %B')}")
+            start_str = format_date(start, format='d', locale=babel_locale)
+            end_str = format_date(end, format='d MMMM', locale=babel_locale)
+            week_ranges.append(f"{start_str}-{end_str}")
         else:
-            week_ranges.append(f"{start.strftime('%-d de %B')}-{end.strftime('%-d de %B').strip()}")
+            start_str = format_date(start, format='d MMMM', locale=babel_locale)
+            end_str = format_date(end, format='d MMMM', locale=babel_locale)
+            week_ranges.append(f"{start_str}-{end_str}")
+
         start = end + timedelta(days=1)
 
     # Save the week_ranges in context.user_data
@@ -401,12 +413,14 @@ async def show_questions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             questions_text += "{0}. {1}\n".format(i+1, data[i])
 
     if not has_questions:
-        # Initialize default questions
+        init_question_1 = _("Una ilustración o ejemplo para explicar algún punto principal del párrafo")
+        init_question_2 = _("Una experiencia en concreto, aportando referencias exactas de jw.org, que esté muy relacionada con el párrafo")
+        init_question_3 = _("Una explicación sobre uno de los textos que aparezcan, que aplique al párrafo. Usa la Biblia de Estudio de los Testigos de Jehová")
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
         cursor.execute(
             "UPDATE Main SET Q1 = ?, Q2 = ?, Q3 = ? WHERE UserId = ?",
-            (init_questions[0], init_questions[1], init_questions[2], user.id)
+            (init_question_1, init_question_2, init_question_3, user.id)
         )
         connection.commit()
         connection.close()
@@ -617,7 +631,7 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     if any(qs):
         if (url is not None) and (date is not None):
-            await message.reply_text(_("Tienes guardados una fecha y una URL. Se está tomando la fecha como valor predeterminado. Si quieres usar la URL, borra la fecha con /date_delete"))
+            await message.reply_text(_("Tienes guardados una fecha y una URL. Se está tomando la fecha como valor predeterminado."))
         if date is not None:
             # Logic to fetch URL based on date
             if url is None:
@@ -660,15 +674,17 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                     publication = cursor.fetchall()
                     cursor.close()
 
-                    # Map langSelected to JW language codes
                     lang_codes = {
-                        'es': 'S',
-                        'en': 'E',
-                        'fr': 'F',
-                        'pt': 'P',
-                        'de': 'D',
-                        'bg': 'B',
-                        # Add other language codes as needed
+                        'es': 'S',          # Español
+                        'en': 'E',          # English
+                        'fr': 'F',          # Français
+                        'pt-PT': 'P',       # Português (Portugal)
+                        'pt-BR': 'PB',      # Português (Brasil)
+                        'de': 'D',          # Deutsch
+                        'bg': 'B',          # Български
+                        'it': 'I',          # Italiano
+                        'nl': 'N',          # Nederlands
+                        'mk': 'M'           # Македонски
                     }
                     lang = lang_codes.get(langSelected, 'E')
 

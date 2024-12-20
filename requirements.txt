@@ -9,3 +9,4 @@ pytz==2024.2
 python-telegram-bot==21.9
 validators==0.34.0
 python-docx==1.1.2
+babel==2.16.0

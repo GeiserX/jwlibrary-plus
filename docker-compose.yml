@@ -1,7 +1,7 @@
 services:
 
   jwlibrary_plus:
-    image: drumsergio/jwlibrary-plus:0.1.41
+    image: drumsergio/jwlibrary-plus:0.3.16
     # build: .
     environment:
       - TOKEN=YOUR-TOKEN
