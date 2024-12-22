@@ -1,34 +1,46 @@
-import shutil
-import pytz
+# core_worker.py
+
+# Import necessary modules
 import os
-import zipfile
+import shutil
 import logging
-import requests
-import json
-from datetime import datetime, timedelta
+import zipfile
+import subprocess
+import hashlib  # For calculating SHA-256 hash
 import sqlite3
+import json
+import pytz
+import requests
+import gettext  # For translations
+from datetime import datetime
 from bs4 import BeautifulSoup
 from docx import Document
-from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from docx.enum.style import WD_STYLE_TYPE
 from docx.shared import Pt
-import subprocess
-from langchain_openai import ChatOpenAI
+
+# Set up logging
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+# Import LangChain and OpenAI
+import openai
+import langchain
 from langchain.cache import SQLiteCache
-from langchain.globals import set_llm_cache
+from langchain.chat_models import ChatOpenAI
+from langchain.memory import ConversationBufferMemory
+from langchain.chains import LLMChain
+from langchain.prompts import (
+    ChatPromptTemplate,
+    SystemMessagePromptTemplate,
+    HumanMessagePromptTemplate,
+    MessagesPlaceholder,
+)
 
 # Set up caching
-cache = SQLiteCache(database_path="/app/dbs/langchain.db")
-set_llm_cache(cache)
-
-from langchain.chains import ConversationChain
-from langchain.memory import ConversationBufferMemory
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder, SystemMessagePromptTemplate, HumanMessagePromptTemplate
-
-import hashlib  # For calculating SHA-256 hash
-
-logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
-logger = logging.getLogger(__name__)
+langchain.llm_cache = SQLiteCache(database_path="/app/dbs/langchain.db")
 
 #######################################
 ### HELPER: DESCRIBE JWLIBRARY FILE ###
@@ -47,19 +59,19 @@ def describe_jwlibrary(telegram_user):
     connection = sqlite3.connect(uploadedDb)
     cursor = connection.cursor()
     cursor.execute("SELECT Count(*) FROM Note")
-    notesN = cursor.fetchall()[0][0]
+    notesN = cursor.fetchone()[0]
     cursor.execute("SELECT Count(*) FROM InputField")
-    inputN = cursor.fetchall()[0][0]
+    inputN = cursor.fetchone()[0]
     cursor.execute("SELECT Count(*) FROM TagMap")
-    tagMaptN = cursor.fetchall()[0][0]
+    tagMaptN = cursor.fetchone()[0]
     cursor.execute("SELECT Count(*) FROM Tag")
-    tagN = cursor.fetchall()[0][0]
+    tagN = cursor.fetchone()[0]
     cursor.execute("SELECT Count(*) FROM Bookmark")
-    bookmarkN = cursor.fetchall()[0][0]
+    bookmarkN = cursor.fetchone()[0]
     cursor.execute("SELECT LastModified FROM LastModified")
-    lastModified = cursor.fetchall()[0][0]
+    lastModified = cursor.fetchone()[0]
     cursor.execute("SELECT Count(*) FROM UserMark")
-    userMarkN = cursor.fetchall()[0][0]
+    userMarkN = cursor.fetchone()[0]
     connection.close()
 
     shutil.rmtree("userBackups/{0}/".format(telegram_user))
@@ -106,39 +118,73 @@ def w_extract_html(url, get_all):
 ### QUERY OPENAI ###
 ####################
 
-def w_query_openai(title, base_text, song, summary, q_map, qs_user):
+def w_query_openai(title, base_text, song, summary, q_map, qs_user, trans):
     logger.info("w_query_openai - Title: {0}".format(title))
 
     questions = [f"{i+1}. {question}" for i, question in enumerate(qs_user) if question]
     questions_text = "\n".join(questions)
     logger.info("w_query_openai - Questions Text: {0}".format(questions_text))
 
-    llm = ChatOpenAI(model_name="gpt-4o-mini")
-    prompt = ChatPromptTemplate.from_messages([
-        SystemMessagePromptTemplate.from_template("""
-Eres un asistente que únicamente usa jw.org y las publicaciones de los Testigos de Jehová para mejorar la preparación de reuniones.
+    # Set up the ChatOpenAI LLM
+    llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
+
+    # Set up the prompt
+    system_prompt_template = trans("""Eres un asistente que únicamente usa jw.org y las publicaciones de los Testigos de Jehová para mejorar la preparación de reuniones.
 Yo estoy preparándome la Atalaya, edición de estudio, de los Testigos de Jehová.
 Proveerás información extra proveniente de la literatura disponible en cada uno de los párrafos que te voy a ir mandando en los sucesivos prompts.
 La Atalaya de esta semana se titula {title}, se basa en el texto de {base_text}, cantaremos la '{song}', y el resumen es el siguiente:
 {summary}
 Para cada pregunta y párrafo o párrafos que te vaya enviando a partir de ahora, responderás en una lista lo siguiente:
 {questions_text}
-No escribas estas preguntas de nuevo en la respuesta. Separa las respuestas con dos retornos de carro.""".format(title=title, base_text=base_text, song=song, summary=summary, questions_text=questions_text)),
+No escribas estas preguntas de nuevo en la respuesta. Separa las respuestas con dos retornos de carro.""")
+
+    system_prompt = system_prompt_template.format(
+        title=title,
+        base_text=base_text,
+        song=song,
+        summary=summary,
+        questions_text=questions_text
+    )
+
+    # Log the full system prompt
+    logger.info("w_query_openai - System Prompt:\n{0}".format(system_prompt))
+
+    prompt = ChatPromptTemplate.from_messages([
+        SystemMessagePromptTemplate.from_template(system_prompt),
         MessagesPlaceholder(variable_name="history"),
         HumanMessagePromptTemplate.from_template("{input}")
     ])
 
     notes = {}
     i = 0
-    for q in q_map.values():
-        conversation = ConversationChain(llm=llm, verbose=False, memory=ConversationBufferMemory(return_messages=True), prompt=prompt)
+
+    for idx, q in enumerate(q_map.values()):
+        memory = ConversationBufferMemory(memory_key="history", return_messages=True)
+        chain = LLMChain(llm=llm, prompt=prompt, memory=memory)
+
+        # Flatten the paragraphs
         flattened_paragraph = "".join([p.text for p in q[1]])
 
-        logger.debug("About to call predict() method.")
-        notes[i] = conversation.predict(input="Pregunta: {0} -- Párrafo(s): {1}".format(q[0].text, flattened_paragraph))
-        logger.debug("Called predict() method, result: {0}".format(notes[i]))
+        # Prepare the user input
+        user_input_template = trans("Pregunta: {question} -- Párrafo(s): {paragraphs}")
+        user_input = user_input_template.format(
+            question=q[0].text,
+            paragraphs=flattened_paragraph
+        )
 
-        logger.info("w_query_openai(Note) - Note: {0}".format(notes[i]))  # TODO: Reduce logs in the future when everything stabilizes
+        # Log the user input
+        logger.info("w_query_openai - User Input for question {0}:\n{1}".format(idx+1, user_input))
+
+        # Log the full prompt (system prompt + user input)
+        logger.info("w_query_openai - Full Prompt for question {0}:\n{1}\n{2}".format(
+            idx+1, system_prompt, user_input))
+
+        # Call the chain to get the response
+        notes[i] = chain.predict(input=user_input)
+
+        # Log the response
+        logger.info("w_query_openai(Note) - Note for question {0}:\n{1}".format(idx+1, notes[i]))
+
         i += 1
 
     return notes
@@ -171,7 +217,6 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
 
     now = datetime.now(pytz.timezone('Europe/Madrid'))
     now_date = now.strftime("%Y-%m-%d")
-    hour_minute_second = now.strftime("%H-%M-%S")
     now_iso = now.isoformat("T", "seconds")
     now_utc = now.astimezone(pytz.UTC)
     now_utc_iso = now_utc.isoformat("T", "seconds").replace('+00:00', 'Z')
@@ -190,13 +235,14 @@ def write_jwlibrary(documentId, articleId, title, questions, notes, telegram_use
 
         connection = sqlite3.connect(uploadedDb)
         cursor = connection.cursor()
-        cursor.execute("SELECT LocationId FROM Location WHERE DocumentId={0}".format(documentId))
+        cursor.execute("SELECT LocationId FROM Location WHERE DocumentId=?", (documentId,))
         locationId = cursor.fetchone()
         if locationId:
             locationId = locationId[0]
         else:
             cursor.execute("SELECT max(LocationId) FROM Location")
-            locationId = cursor.fetchone()[0] + 1
+            max_location_id = cursor.fetchone()[0]
+            locationId = max_location_id + 1 if max_location_id else 1
             cursor.execute("""INSERT INTO Location (LocationId, DocumentId, IssueTagNumber, KeySymbol, Type)
                 VALUES (?, ?, ?, "w", 0);""", (locationId, documentId, articleId))
 
@@ -329,12 +375,27 @@ def write_docx_pdf(documentId, title, questions, notes, telegram_user):
 ### MAIN CODE ##
 ################
 
-def main(url, telegram_user, qs_user):
+def main(url, telegram_user, qs_user, language):
+    # Set up translation function
+    domain = "jwlibraryplus"
+    locale_dir = os.path.join(os.path.dirname(__file__), '../locales')
+    translation = gettext.translation(domain, localedir=locale_dir, languages=[language], fallback=True)
+    trans = translation.gettext
+
     title, base_text, song, summary, questions, documentId, articleId, q_map, textareas = w_extract_html(url, get_all=True)
-    notes = w_query_openai(title, base_text, song, summary, q_map, qs_user)
+    notes = w_query_openai(title, base_text, song, summary, q_map, qs_user, trans)
     filenamejw = write_jwlibrary(documentId, articleId, title, questions, notes, telegram_user, textareas)
     filenamedoc, filenamepdf = write_docx_pdf(documentId, title, questions, notes, telegram_user)
     return filenamejw, filenamedoc, filenamepdf
 
 if __name__ == "__main__":
-    main()
+    # Example usage
+    url = "https://www.jw.org/en/library/magazines/watchtower-study-june-2021/do-not-neglect-the-good-you-should-be-doing/"
+    telegram_user = "user_id"  # Replace with actual Telegram user ID
+    qs_user = [
+        "Una ilustración o ejemplo para explicar algún punto principal del párrafo",
+        "Una experiencia en concreto, aportando referencias exactas de jw.org, que esté muy relacionada con el párrafo",
+        "Una explicación sobre uno de los textos que aparezcan, que aplique al párrafo. Usa la Biblia de Estudio de los Testigos de Jehová"
+    ]
+    language = "es"  # Replace with the desired language code, e.g., "en" for English
+    main(url, telegram_user, qs_user, language)
