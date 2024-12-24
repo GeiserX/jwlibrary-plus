@@ -415,13 +415,13 @@ def fetch_url_from_date(date_selection, langSelected):
             'es': 'S',          # Español
             'en': 'E',          # English
             'fr': 'F',          # Français
-            'pt-PT': 'P',       # Português (Portugal)
-            'pt-BR': 'PB',      # Português (Brasil)
-            'de': 'D',          # Deutsch
-            'bg': 'B',          # Български
+            'pt-PT': 'TPO',       # Português (Portugal)
+            'pt-BR': 'T',      # Português (Brasil)
+            'de': 'X',          # Deutsch
+            'bg': 'BL',          # Български
             'it': 'I',          # Italiano
-            'nl': 'N',          # Nederlands
-            'mk': 'M'           # Македонски
+            'nl': 'O',          # Nederlands
+            'mk': 'MC'           # Македонски
         }
         lang = lang_codes.get(langSelected, 'E')
 
