@@ -96,20 +96,33 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
     await check_if_user_exists(update, context)
 
+    # Define welcome_message
+    welcome_message = _("¡Bienvenido!\n\nEste bot le ayudará a mejorar y profundizar en la preparación de <b>La Atalaya</b> usando <b>Inteligencia Artificial</b>. El modelo está personalizado por mí en OpenAI para intentar apegarse lo más posible a la realidad, pero es imposible que todas las respuestas sean correctas y sin alucinaciones.\n\nEl bot funciona respondiendo a las preguntas que le dictes. Es decir: si en la pregunta 1 le solicitas que te explique algún punto del párrafo con una ilustración, lo que hará será contestar a la pregunta del/los párrafo(s) de La Atalaya e introducirla en el recuadro de texto habilitado para ello.\n\nMás adelante <b>se te sugerirá enviar tu archivo de respaldo de .jwlibrary para no perder ninguna información en tu dispositivo</b>. Esto es particularmente importante ya que al restaurar el archivo .jwlibrary que se genera, tus notas y marcas que tenías anteriormente en la aplicación se perderán. Recomendamos, además, que el artículo de estudio que quieras prepararte esté vacío en tu dispositivo para evitar incongruencias.\n\nEsta aplicación no es oficial ni está afiliada de ningún modo con JW.ORG.\n\nSi el bot tarda en responder, espera unos minutos y contacta con @geiserdrums. El bot sirve a cada usuario individualmente de manera secuencial, con lo que quizá lo esté usando otra persona en este mismo instante. Sé paciente.")
+
+    logger.info("START - User ID: {0} - Username: {1}".format(user.id, user.username))
+    # Reset the conversation_active flag
+    context.user_data['conversation_active'] = True
+
+    context.user_data['command'] = 'start'  # Indicate that the entry point is /start
+
+    if user.is_bot:
+        await update.message.reply_text(_("Los bots no están permitidos"))
+        return ConversationHandler.END
+
     # Check LastRun timestamp unless user is admin
-    if user.id != 835003:  # Admin user ID
+    if user.id not in [835003, 5978895313]:
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
         cursor.execute("SELECT LastRun, LangSelected FROM Main WHERE UserId = ?", (user.id,))
         result = cursor.fetchone()
         connection.close()
 
-        last_run_str = result[0] if result else None
-        lang_selected = result[1] if result else None
-
-        # Set the user's selected language in context
-        if lang_selected:
-            context.user_data['language'] = lang_selected
+        if result:
+            last_run_str = result[0]
+            lang_selected = result[1]
+        else:
+            last_run_str = None
+            lang_selected = None
 
         now = datetime.now(pytz.timezone('Europe/Madrid'))
         if last_run_str:
@@ -124,31 +137,33 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                     trans("Por favor, inténtelo de nuevo dentro de {} minutos. Así puedo controlar mejor los gastos, ya que es gratuito. Si tiene algún problema, contacte con @geiserdrums").format(minutes)
                 )
                 return ConversationHandler.END  # End the conversation
+
     else:
         # Admin user bypasses the last run check
+        last_run_str = None
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
         cursor.execute("SELECT LangSelected FROM Main WHERE UserId = ?", (user.id,))
         result = cursor.fetchone()
         connection.close()
         lang_selected = result[0] if result else None
-        if lang_selected:
-            context.user_data['language'] = lang_selected
 
-    # Set up translation
-    if 'language' in context.user_data:
+    # Set the user's selected language in context
+    if lang_selected:
+        context.user_data['language'] = lang_selected
         context.user_data['translation'] = get_translation(context)
     else:
-        # Default to Spanish
-        context.user_data['language'] = 'es'
-        context.user_data['translation'] = get_translation(context)
+        context.user_data['language'] = None
 
-    translation = context.user_data['translation']
-    trans = translation.gettext
+    if context.user_data['language']:
+        # Language is already set; proceed
+        translation = context.user_data['translation']
+        trans = translation.gettext
+    else:
+        # Prompt user to select language
+        return await language_select(update, context)
 
-    # No longer resetting default questions here
-    # Instead, ensure they are initialized if the user has no questions
-    user = update.effective_user
+    # Ensure default questions are initialized if needed
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
     cursor.execute("SELECT Q1,Q2,Q3,Q4,Q5,Q6,Q7,Q8,Q9,Q10 FROM Main WHERE UserId = ?", (user.id,))
@@ -166,27 +181,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         connection.commit()
         connection.close()
 
-    # Define welcome_message
-    welcome_message = _("¡Bienvenido!\n\nEste bot le ayudará a mejorar y profundizar en la preparación de <b>La Atalaya</b> usando <b>Inteligencia Artificial</b>. El modelo está personalizado por mí en OpenAI para intentar apegarse lo más posible a la realidad, pero es imposible que todas las respuestas sean correctas y sin alucinaciones.\n\nEl bot funciona respondiendo a las preguntas que le dictes. Es decir: si en la pregunta 1, le solicitas que te explique algún punto del párrafo con una ilustración, lo que hará será contestar a la pregunta de el/los párrafo(s) de la Atalaya, e introducirla en el recuadro de texto habilitado para ello.\n\nMás adelante <b>se le sugerirá enviar su archivo de respaldo de .jwlibrary para no perder ninguna información en su dispositivo</b>. Esto es particularmente importante, ya que al restaurar el archivo .jwlibrary que se genera, sus notas y marcas que tenía anteriormente en la aplicación, se perderán. Recomendamos, además, que el artículo de estudio que quiera prepararse esté vacío en su dispositivo, para evitar incongruencias.\n\nEsta aplicación no es oficial ni está afiliada de ningún modo con JW.ORG\n\nSi el bot tardara en responder, espere unos minutos y contacte con @geiserdrums. El bot sirve a cada usuario individualmente de manera secuencial, con lo que quizá lo esté usando otra persona en este mismo instante, sea paciente")
-
-    logger.info("START - User ID: {0} - Username: {1}".format(user.id, user.username))
-    # Reset the conversation_active flag
-    context.user_data['conversation_active'] = True
-
-    context.user_data['command'] = 'start'  # Indicate that the entry point is /start
-
-    # Send the greeting message
-    if user.is_bot:
-        await update.message.reply_text(trans("Los bots no están permitidos"))
-        return ConversationHandler.END
-
-    if 'language' in context.user_data:
-        # Language is already set; send welcome message and proceed to the next step
-        await update.message.reply_text(trans(welcome_message), parse_mode=telegram.constants.ParseMode.HTML)
-        return await ask_backup(update, context)
-    else:
-        # Ask user to select language
-        return await language_select(update, context)
+    # Send the welcome message
+    await update.message.reply_text(trans(welcome_message), parse_mode=telegram.constants.ParseMode.HTML)
+    return await ask_backup(update, context)
 
 async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
@@ -880,7 +877,7 @@ async def after_preparation(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     now = datetime.now(pytz.timezone('Europe/Madrid'))
 
     # Check LastRun timestamp unless user is admin
-    if user.id != 835003:
+    if user.id not in [835003, 5978895313]:
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
         cursor.execute("SELECT LastRun FROM Main WHERE UserId = ?", (user.id,))
@@ -892,12 +889,11 @@ async def after_preparation(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             if last_run_str:
                 last_run = datetime.fromisoformat(last_run_str)
                 time_since_last_run = now - last_run
-                if time_since_last_run < timedelta(hours=8):
-                    remaining_time = timedelta(hours=8) - time_since_last_run
-                    hours, remainder = divmod(remaining_time.seconds, 3600)
-                    minutes, _ = divmod(remainder, 60)
+                if time_since_last_run < timedelta(hours=1):
+                    remaining_time = timedelta(hours=1) - time_since_last_run
+                    minutes = int(remaining_time.total_seconds() // 60)
                     await query.message.reply_text(
-                        trans("Por favor, inténtelo de nuevo dentro de {0} horas y {1} minutos. Así puedo controlar mejor los gastos, ya que es gratuito. Si tiene algún problema, contacte con @geiserdrums").format(hours, minutes)
+                        trans("Por favor, inténtelo de nuevo dentro de {} minutos. Así puedo controlar mejor los gastos, ya que es gratuito. Si tiene algún problema, contacte con @geiserdrums").format(minutes)
                     )
                     # Conversation ends
                     context.user_data['conversation_active'] = False
@@ -927,7 +923,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def admin_broadcast_msg(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    if user.id == 835003:  # Admin user ID
+    if user.id in [835003, 5978895313]:
         message_text = update.message.text.partition(' ')[2]  # Get text after command
         if not message_text:
             await update.message.reply_text("Por favor, proporciona un mensaje para enviar a todos los usuarios.")
