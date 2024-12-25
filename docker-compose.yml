@@ -5,7 +5,9 @@ services:
     # build: .
     environment:
       - TOKEN=YOUR-TOKEN
+      - TOKEN_NOTIFY=YOUR-OTHER-BOT-TOKEN
       - OPENAI_API_KEY=OPENAI-KEY
+      #- ADMIN_ID=
     volumes:
       - dbs:/app/dbs
       - userBackups:/app/userBackups

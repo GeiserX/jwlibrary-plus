@@ -754,6 +754,7 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
     translation = context.user_data['translation']
     trans = translation.gettext
+
     # Determine the message object
     if update.message:
         message = update.message
@@ -771,6 +772,7 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Fetch necessary data from the database
     connection = sqlite3.connect("dbs/main.db")
     cursor = connection.cursor()
+
     cursor.execute("SELECT Url FROM Main WHERE UserId = ?", (user.id,))
     url_result = cursor.fetchone()
     cursor.execute("SELECT WeekDelta FROM Main WHERE UserId = ?", (user.id,))
@@ -781,12 +783,20 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lastRun_result = cursor.fetchone()
     cursor.execute("SELECT LangSelected FROM Main WHERE UserId = ?", (user.id,))
     langSelected_result = cursor.fetchone()
+    # Fetch additional user info
+    cursor.execute("SELECT UserName, FirstName, LastName, LangCodeTelegram FROM Main WHERE UserId = ?", (user.id,))
+    user_info = cursor.fetchone()
     connection.close()
 
     url = url_result[0] if url_result else None
     date = date_result[0] if date_result else None
     lastRun = lastRun_result[0] if lastRun_result else None
     langSelected = langSelected_result[0] if langSelected_result else 'es'
+
+    username = user_info[0] if user_info else ''
+    firstname = user_info[1] if user_info else ''
+    lastname = user_info[2] if user_info else ''
+    langcodetelegram = user_info[3] if user_info else ''
 
     now = datetime.now(pytz.timezone('Europe/Madrid'))  # Adjust timezone as needed
     now_iso = now.isoformat("T", "seconds")
@@ -801,6 +811,31 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     connection.close()
 
     logger.info("BEGIN W_PREPARE - User ID: {0} - URL: {1} - WeekDelta: {2} - Questions: {3} - LastRun: {4}".format(user.id, url, date, qs, lastRun))
+
+    # New code to send notification
+    try:
+        # Get the TOKEN_NOTIFY from environment variable
+        TOKEN_NOTIFY = os.environ["TOKEN_NOTIFY"]
+        notify_bot = telegram.Bot(token=TOKEN_NOTIFY)
+        # Prepare the message
+        message_text = (
+            f"User Started Preparation:\n"
+            f"UserId: {user.id}\n"
+            f"UserName: {username}\n"
+            f"FirstName: {firstname}\n"
+            f"LastName: {lastname}\n"
+            f"LangCodeTelegram: {langcodetelegram}\n"
+            f"LangSelected: {langSelected}\n"
+            f"Url: {url}\n"
+            f"WeekDelta: {date}\n"
+            f"Questions:\n"
+        )
+        for i, q in enumerate(qs, start=1):
+            message_text += f"q{i}: {q}\n"
+        # Send the message to user ID 835003
+        await notify_bot.send_message(chat_id=835003, text=message_text)
+    except Exception as e:
+        logger.error("Error sending notification: %s", e)
 
     if any(qs):
         if (url is not None) and (date is not None):
@@ -826,7 +861,7 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             await message.reply_text(trans("Comenzando peticiones a ChatGPT. Podría tardar varios minutos dependiendo del número de preguntas que hayas configurado."))
 
             try:
-                # Call the modified core_worker.main function
+                # Call the core_worker.main function
                 filenamejw, filenamedoc, filenamepdf = core_worker.main(url, user.id, qs, langSelected)
 
                 if os.path.isfile('userBackups/{0}.jwlibrary'.format(user.id)):
