@@ -33,10 +33,7 @@ from langchain.chat_models import ChatOpenAI
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import LLMChain
 from langchain.prompts import (
-    ChatPromptTemplate,
-    SystemMessagePromptTemplate,
-    HumanMessagePromptTemplate,
-    MessagesPlaceholder,
+    PromptTemplate
 )
 
 # Set up caching
@@ -119,16 +116,14 @@ def w_extract_html(url, get_all):
 ####################
 
 def w_query_openai(title, base_text, song, summary, q_map, qs_user, trans):
+    logger = logging.getLogger(__name__)
     logger.info("w_query_openai - Title: {0}".format(title))
 
     questions = [f"{i+1}. {question}" for i, question in enumerate(qs_user) if question]
     questions_text = "\n".join(questions)
     logger.info("w_query_openai - Questions Text: {0}".format(questions_text))
 
-    # Set up the ChatOpenAI LLM
-    llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
-
-    # Set up the prompt
+    # Prepare the system prompt (now incorporated into the user input)
     system_prompt_template = trans("""Eres un asistente que únicamente usa jw.org y las publicaciones de los Testigos de Jehová para mejorar la preparación de reuniones.
 Yo estoy preparándome la Atalaya, edición de estudio, de los Testigos de Jehová.
 Proveerás información extra proveniente de la literatura disponible en cada uno de los párrafos que te voy a ir mandando en los sucesivos prompts.
@@ -146,21 +141,20 @@ No escribas estas preguntas de nuevo en la respuesta. Separa las respuestas con 
         questions_text=questions_text
     )
 
-    # Log the full system prompt
+    # Log the system prompt
     logger.info("w_query_openai - System Prompt:\n{0}".format(system_prompt))
 
-    prompt = ChatPromptTemplate.from_messages([
-        SystemMessagePromptTemplate.from_template(system_prompt),
-        MessagesPlaceholder(variable_name="history"),
-        HumanMessagePromptTemplate.from_template("{input}")
-    ])
+    # Set up the ChatOpenAI LLM with temperature set to 1
+    llm = ChatOpenAI(model_name="o1-mini", temperature=1)
+
+    # Define a simple prompt that just uses the input
+    prompt = PromptTemplate.from_template("{input}")
 
     notes = {}
     i = 0
 
     for idx, q in enumerate(q_map.values()):
-        memory = ConversationBufferMemory(memory_key="history", return_messages=True)
-        chain = LLMChain(llm=llm, prompt=prompt, memory=memory)
+        chain = LLMChain(llm=llm, prompt=prompt)
 
         # Flatten the paragraphs
         flattened_paragraph = "".join([p.text for p in q[1]])
@@ -172,15 +166,17 @@ No escribas estas preguntas de nuevo en la respuesta. Separa las respuestas con 
             paragraphs=flattened_paragraph
         )
 
+        # Combine the system prompt and user input
+        full_input = system_prompt + "\n\n" + user_input
+
         # Log the user input
         logger.info("w_query_openai - User Input for question {0}:\n{1}".format(idx+1, user_input))
 
-        # Log the full prompt (system prompt + user input)
-        logger.info("w_query_openai - Full Prompt for question {0}:\n{1}\n{2}".format(
-            idx+1, system_prompt, user_input))
+        # Log the full input (system prompt + user input)
+        logger.info("w_query_openai - Full Input for question {0}:\n{1}".format(idx+1, full_input))
 
         # Call the chain to get the response
-        notes[i] = chain.predict(input=user_input)
+        notes[i] = chain.predict(input=full_input)
 
         # Log the response
         logger.info("w_query_openai(Note) - Note for question {0}:\n{1}".format(idx+1, notes[i]))

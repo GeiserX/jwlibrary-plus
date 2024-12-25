@@ -950,6 +950,40 @@ async def admin_broadcast_msg(update: Update, context: ContextTypes.DEFAULT_TYPE
 def main() -> None:
     application = Application.builder().token(os.environ["TOKEN"]).build()
 
+    # Create 'dbs' directory if not exists
+    os.makedirs('dbs', exist_ok=True)
+
+    # Connect to the SQLite database
+    connection = sqlite3.connect("dbs/main.db")
+    cursor = connection.cursor()
+
+    # Create the 'Main' table if it does not exist
+    cursor.execute('''CREATE TABLE IF NOT EXISTS "Main" (
+    	"UserId"	INTEGER NOT NULL,
+    	"UserName"	TEXT,
+    	"FirstName"	TEXT,
+    	"LastName"	TEXT,
+    	"LangCodeTelegram"	TEXT,
+    	"LangSelected"	TEXT,
+    	"IsBot"	TEXT,
+    	"Url"	TEXT,
+    	"WeekDelta"	INTEGER,
+    	"Q1"	TEXT,
+    	"Q2"	TEXT,
+    	"Q3"	TEXT,
+    	"Q4"	TEXT,
+    	"Q5"	TEXT,
+    	"Q6"	TEXT,
+    	"Q7"	TEXT,
+    	"Q8"	TEXT,
+    	"Q9"	TEXT,
+    	"Q10"	TEXT,
+    	"LastRun"	TEXT,
+    	PRIMARY KEY("UserId")
+    );''')
+    connection.commit() # ALTER TABLE Main DROP COLUMN StandardLangCode; - delete when next version
+    connection.close()
+
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start), CommandHandler('change_language', change_language)],
         states={
