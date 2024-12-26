@@ -375,27 +375,63 @@ async def ask_date_or_url(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 def fetch_url_from_date(date_selection, langSelected):
     try:
+        # Calculate the dates for the selected week and previous weeks
         now = datetime.now(pytz.timezone('Europe/Madrid'))
         start_date = now - timedelta(days=now.weekday()) + timedelta(int(date_selection)*7)
         dates = []
         for i in range(5):
             dates.append((start_date - timedelta(7*i)).strftime("%Y-%m-%d"))
 
-        jsonurl = requests.get("https://app.jw-cdn.org/catalogs/publications/v4/manifest.json")
-        manifest_id = jsonurl.json()['current']
-        catalog = requests.get("https://app.jw-cdn.org/catalogs/publications/v4/" + manifest_id + "/catalog.db.gz")
-        os.makedirs('dbs', exist_ok=True)
-        open('catalog.db.gz', 'wb').write(catalog.content)
-        with gzip.open("catalog.db.gz", "rb") as f:
-            with open('dbs/catalog.db', 'wb') as f_out:
-                shutil.copyfileobj(f, f_out)
-        os.remove("catalog.db.gz")
-        connection = sqlite3.connect("dbs/catalog.db")
+        # Path to the local catalog database
+        catalog_db_path = 'dbs/catalog.db'
+        need_download = True  # Flag to determine if we need to download the catalog
+
+        # Check if the catalog.db file exists
+        if os.path.exists(catalog_db_path):
+            # Get the last modified time of the file
+            mtime = os.path.getmtime(catalog_db_path)
+            last_modified_date = datetime.fromtimestamp(mtime)
+            # Check if the file is less than 30 days old
+            if datetime.now() - last_modified_date < timedelta(days=30):
+                need_download = False  # No need to download, it's recent enough
+                logger.info("NEED_DOWNLOAD catalog.db FALSE - Last modified date: {0}".format(last_modified_date))
+
+        if need_download:
+            logger.info("NEED_DOWNLOAD catalog.db TRUE")
+            # Proceed to download the latest catalog.db.gz
+            jsonurl = requests.get("https://app.jw-cdn.org/catalogs/publications/v4/manifest.json")
+            manifest_id = jsonurl.json()['current']
+            catalog_url = f"https://app.jw-cdn.org/catalogs/publications/v4/{manifest_id}/catalog.db.gz"
+            catalog_response = requests.get(catalog_url)
+
+            # Ensure the dbs directory exists
+            os.makedirs('dbs', exist_ok=True)
+
+            # Save the downloaded catalog.db.gz file
+            with open('catalog.db.gz', 'wb') as f:
+                f.write(catalog_response.content)
+
+            # Extract catalog.db from the gzipped file
+            with gzip.open("catalog.db.gz", "rb") as gz_file:
+                with open(catalog_db_path, 'wb') as db_file:
+                    shutil.copyfileobj(gz_file, db_file)
+
+            # Remove the gzipped file to save space
+            os.remove("catalog.db.gz")
+
+        # Connect to the catalog database
+        connection = sqlite3.connect(catalog_db_path)
         cursor = connection.cursor()
-        cursor.execute("SELECT * FROM DatedText WHERE Class = 68 AND (Start = ? OR Start = ? OR Start = ? OR Start = ? OR Start = ?)", (dates[0], dates[1], dates[2], dates[3], dates[4]))
+
+        # Fetch the study articles for the given dates
+        cursor.execute(
+            "SELECT * FROM DatedText WHERE Class = 68 AND (Start = ? OR Start = ? OR Start = ? OR Start = ? OR Start = ?)",
+            (dates[0], dates[1], dates[2], dates[3], dates[4])
+        )
         dates_catalog = cursor.fetchall()
 
-        list_of_dates = [datetime.strptime(x[1],"%Y-%m-%d") for x in dates_catalog]
+        # Process the fetched dates to find the most recent one
+        list_of_dates = [datetime.strptime(x[1], "%Y-%m-%d") for x in dates_catalog]
         date_count = Counter(list_of_dates)
         selected_dates = [date for date in list_of_dates if date_count[date] > 100]
 
@@ -406,33 +442,39 @@ def fetch_url_from_date(date_selection, langSelected):
         delta_start_week_found = dates.index(newest_date)
         possiblePubId = [str(x[3]) for x in dates_catalog if x[1] == newest_date]
 
-        cursor.execute("SELECT PublicationRootKeyId, IssueTagNumber, Symbol, Title, IssueTitle, Year, Id FROM Publication WHERE MepsLanguageId = 1 AND Id IN ({0})".format(', '.join(possiblePubId)))
+        cursor.execute(
+            f"SELECT PublicationRootKeyId, IssueTagNumber, Symbol, Title, IssueTitle, Year, Id "
+            f"FROM Publication WHERE MepsLanguageId = 1 AND Id IN ({', '.join(possiblePubId)})"
+        )
         publication = cursor.fetchall()
         cursor.close()
         connection.close()
 
+        # Map the language codes to the ones used by JW.org
         lang_codes = {
             'es': 'S',          # Español
             'en': 'E',          # English
             'fr': 'F',          # Français
-            'pt-PT': 'TPO',       # Português (Portugal)
-            'pt-BR': 'T',      # Português (Brasil)
+            'pt-PT': 'TPO',     # Português (Portugal)
+            'pt-BR': 'T',       # Português (Brasil)
             'de': 'X',          # Deutsch
-            'bg': 'BL',          # Български
+            'bg': 'BL',         # Български
             'it': 'I',          # Italiano
             'nl': 'O',          # Nederlands
-            'mk': 'MC'           # Македонски
+            'mk': 'MC'          # Македонски
         }
         lang = lang_codes.get(langSelected, 'E')
 
+        # Construct the URL for the magazine issue
         year = publication[0][5]
         symbol = publication[0][2]
         month = str(publication[0][1])[4:6]
         magazine_url = f"https://www.jw.org/finder?wtlocale={lang}&issue={year}-{month}&pub={symbol}"
         magazine = requests.get(magazine_url).text
         soup = BeautifulSoup(magazine, features="html.parser")
-        div_study_articles = soup.find_all("div", {"class":"docClass-40"})
+        div_study_articles = soup.find_all("div", {"class": "docClass-40"})
 
+        # Get the URL of the specific study article based on the date
         url = "https://www.jw.org" + div_study_articles[delta_start_week_found].find("a").get("href")
 
         return url
