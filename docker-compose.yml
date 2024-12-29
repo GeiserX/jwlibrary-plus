@@ -1,13 +1,13 @@
 services:
 
   jwlibrary_plus:
-    image: drumsergio/jwlibrary-plus:0.3.16
+    image: drumsergio/jwlibrary-plus:0.4.68
     # build: .
     environment:
       - TOKEN=YOUR-TOKEN
       - TOKEN_NOTIFY=YOUR-OTHER-BOT-TOKEN
       - OPENAI_API_KEY=OPENAI-KEY
-      #- ADMIN_ID=
+      - ADMIN_ID=TELEGRAM-ADMIN-ID
     volumes:
       - dbs:/app/dbs
       - userBackups:/app/userBackups

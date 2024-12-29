@@ -50,6 +50,8 @@ consoleHandler = logging.StreamHandler(sys.stdout)
 consoleHandler.setFormatter(logFormatter)
 logger.addHandler(consoleHandler)
 
+admin_id = int(os.environ.get('ADMIN_ID'))
+
 # Cache for translation objects
 translations_cache = {}
 
@@ -70,6 +72,13 @@ def get_translation(context):
         translations_cache['es'] = translation
 
     return translation
+
+async def startup_message(application: Application):
+    message = "Booted up"
+    try:
+        await application.bot.send_message(chat_id=admin_id, text=message)
+    except Exception as e:
+        logger.error(f"Failed to send startup message to admin {admin_id}: {e}")
 
 async def check_if_user_exists(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
@@ -110,7 +119,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return ConversationHandler.END
 
     # Check LastRun timestamp unless user is admin
-    if user.id not in [835003, 5978895313]:
+    if user.id != admin_id:
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
         cursor.execute("SELECT LastRun, LangSelected FROM Main WHERE UserId = ?", (user.id,))
@@ -307,6 +316,7 @@ async def receive_keep_questions_response(update: Update, context: ContextTypes.
     return await ask_backup(update, context)
 
 async def ask_backup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data['backup_provided'] = False
     translation = context.user_data['translation']
     trans = translation.gettext
     context.user_data['conversation_active'] = True  # Set flag indicating conversation is active
@@ -327,7 +337,9 @@ async def receive_backup_file_document(update: Update, context: ContextTypes.DEF
     if file_path.endswith(".jwlibrary"):
         # Save the file
         file = await context.bot.get_file(file.file_id)
+        os.makedirs('userBackups', exist_ok=True)
         await file.download_to_drive('userBackups/{0}.jwlibrary'.format(user.id))
+        context.user_data['backup_provided'] = True
         # Run describe_jwlibrary and post output
         try:
             notesN, inputN, tagMaptN, tagN, bookmarkN, lastModified, userMarkN = core_worker.describe_jwlibrary(user.id)
@@ -874,8 +886,7 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         )
         for i, q in enumerate(qs, start=1):
             message_text += f"q{i}: {q}\n"
-        # Send the message to user ID 835003
-        await notify_bot.send_message(chat_id=835003, text=message_text)
+        await notify_bot.send_message(chat_id=admin_id, text=message_text)
     except Exception as e:
         logger.error("Error sending notification: %s", e)
 
@@ -906,7 +917,7 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                 # Call the core_worker.main function
                 filenamejw, filenamedoc, filenamepdf = core_worker.main(url, user.id, qs, langSelected)
 
-                if os.path.isfile('userBackups/{0}.jwlibrary'.format(user.id)):
+                if context.user_data.get('backup_provided', False):
                     await message.reply_text(trans("Aquí tienes tu fichero, impórtalo en JW Library."))
                 else:
                     await message.reply_text(trans("Aquí tienes tu fichero, impórtalo en JW Library.\nNota: Al no haber proporcionado tu copia de seguridad, hazlo con precaución, puedes perder tus datos de la app."))
@@ -939,7 +950,7 @@ async def w_prepare(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         [InlineKeyboardButton(trans("No"), callback_data='no')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await message.reply_text(trans("¿Deseas preparar con otras preguntas u otro artículo de La Atalaya?\nNota: Si decide no seguir, las preguntas adicionales que haya añadido se eliminarán."), reply_markup=reply_markup)
+    await message.reply_text(trans("¿Deseas preparar La Atalaya con otras preguntas u otro artículo?"), reply_markup=reply_markup)
     return AFTER_PREPARATION
 
 async def after_preparation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -954,7 +965,7 @@ async def after_preparation(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     now = datetime.now(pytz.timezone('Europe/Madrid'))
 
     # Check LastRun timestamp unless user is admin
-    if user.id not in [835003, 5978895313]:
+    if user.id != admin_id:
         connection = sqlite3.connect("dbs/main.db")
         cursor = connection.cursor()
         cursor.execute("SELECT LastRun FROM Main WHERE UserId = ?", (user.id,))
@@ -1000,7 +1011,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def admin_broadcast_msg(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    if user.id in [835003, 5978895313]:
+    if user.id in admin_id:
         message_text = update.message.text.partition(' ')[2]  # Get text after command
         if not message_text:
             await update.message.reply_text("Por favor, proporciona un mensaje para enviar a todos los usuarios.")
@@ -1025,7 +1036,7 @@ async def admin_broadcast_msg(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text("No tienes permiso para usar este comando.")
 
 def main() -> None:
-    application = Application.builder().token(os.environ["TOKEN"]).build()
+    application = Application.builder().token(os.environ["TOKEN"]).post_init(startup_message).build()
 
     # Create 'dbs' directory if not exists
     os.makedirs('dbs', exist_ok=True)
